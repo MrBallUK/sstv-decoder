@@ -2,6 +2,8 @@
 
 Browser-based HF SSTV decoder for KiwiSDR streams.
 
+<img width="2383" height="1184" alt="image" src="https://github.com/user-attachments/assets/0d67e8cd-cd60-4e67-930c-a81145066575" />
+
 `SSTVRx` is a single-file web app (`sstv-decoder.html`) that connects to public/private KiwiSDR receivers, demodulates SSTV audio, and renders received images live.
 
 ## Features
