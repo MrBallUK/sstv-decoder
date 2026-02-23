@@ -1,0 +1,3597 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSTVRx — Slow Scan TV Decoder</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #eef3f9;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface2: #f5f8fd;
+  --border: #d7e1ef;
+  --accent: #0f766e;
+  --accent2: #f97316;
+  --accent3: #2563eb;
+  --warn: #d97706;
+  --text: #0f172a;
+  --text-dim: #6b7b91;
+  --text-bright: #0b1220;
+  --glow: 0 10px 30px rgba(15, 118, 110, 0.2);
+  --glow2: 0 10px 30px rgba(249, 115, 22, 0.2);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(37, 99, 235, 0.14), transparent 45%),
+    radial-gradient(circle at 86% 4%, rgba(15, 118, 110, 0.16), transparent 40%),
+    radial-gradient(circle at 80% 84%, rgba(249, 115, 22, 0.1), transparent 45%),
+    var(--bg);
+  color: var(--text);
+  font-family: 'Sora', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
+  background-size: 26px 26px;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: min(2400px, 98vw);
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-height: 100vh;
+  gap: 14px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.logo-main {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-bright);
+}
+
+.logo-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.stat-val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent3);
+  line-height: 1;
+}
+
+.stat-lbl {
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9aa8be;
+  transition: all 0.2s ease;
+}
+
+.dot.active {
+  background: var(--accent);
+  box-shadow: 0 0 0 6px rgba(15, 118, 110, 0.12);
+  animation: pulseDot 1.2s ease-in-out infinite;
+}
+
+.dot.error {
+  background: var(--accent2);
+  box-shadow: 0 0 0 6px rgba(249, 115, 22, 0.12);
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.84); }
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(380px, 2.4fr) minmax(130px, 0.9fr) minmax(160px, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+  padding: 11px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+}
+
+.ctrl-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+label {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  background: #ffffff;
+  color: var(--text-bright);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+input:focus,
+select:focus {
+  border-color: rgba(37, 99, 235, 0.5);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+select option { background: #ffffff; }
+
+.btn {
+  border: 1px solid;
+  border-radius: 11px;
+  min-height: 42px;
+  padding: 9px 15px;
+  background: #ffffff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn-primary {
+  border-color: var(--accent3);
+  color: #ffffff;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+}
+
+.btn-primary:hover,
+.btn-primary.active {
+  filter: brightness(1.05);
+}
+
+.btn-success {
+  border-color: var(--accent);
+  color: #ffffff;
+  background: linear-gradient(135deg, #0f766e, #14b8a6);
+  box-shadow: var(--glow);
+}
+
+.btn-success:hover {
+  filter: brightness(1.05);
+}
+
+.btn-danger {
+  border-color: var(--accent2);
+  color: #ffffff;
+  background: linear-gradient(135deg, #ea580c, #f97316);
+  box-shadow: var(--glow2);
+}
+
+.btn-danger:hover {
+  filter: brightness(1.05);
+}
+
+.btn-compact {
+  min-height: 30px;
+  padding: 4px 10px;
+  border-radius: 9px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+.btn-toggle {
+  border-color: var(--border);
+  color: var(--text-dim);
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.btn-toggle:hover {
+  border-color: rgba(37, 99, 235, 0.45);
+  color: var(--accent3);
+  transform: translateY(0);
+}
+
+.btn-toggle.active {
+  border-color: var(--accent3);
+  color: #ffffff;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.24);
+}
+
+.mixed-content-warn {
+  display: none;
+  grid-column: 1 / -1;
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-left: 4px solid var(--warn);
+  border-radius: 11px;
+  background: rgba(217, 119, 6, 0.08);
+  color: #9a5708;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  padding: 10px 12px;
+}
+
+.server-picker-wrap { position: relative; }
+
+.server-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 600;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.18);
+  overflow: hidden;
+  animation: menuIn 0.16s ease;
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.server-dropdown-header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface2);
+  flex-shrink: 0;
+}
+
+.sdd-title {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.sdd-refresh {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  padding: 3px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.sdd-refresh:hover {
+  border-color: rgba(37, 99, 235, 0.5);
+  color: var(--accent3);
+}
+
+.sdd-refresh.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.server-list {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.server-list::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar,
+.gallery::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar,
+.raw-log::-webkit-scrollbar {
+  width: 8px;
+}
+
+.server-list::-webkit-scrollbar-thumb,
+.sidebar::-webkit-scrollbar-thumb,
+.gallery::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb,
+.raw-log::-webkit-scrollbar-thumb {
+  border-radius: 20px;
+  background: #c5d3e7;
+}
+
+.server-item {
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf1f7;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+
+.server-item:hover {
+  background: #f4f8ff;
+}
+
+.server-item.full {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.srv-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-bright);
+}
+
+.srv-host {
+  margin-top: 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--accent3);
+}
+
+.srv-location {
+  margin-top: 1px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.srv-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.srv-users {
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  border: 1px solid;
+}
+
+.srv-users.open { color: #0a7f77; border-color: #61c4bc; background: rgba(20, 184, 166, 0.09); }
+.srv-users.full { color: #a85a11; border-color: #efb678; background: rgba(249, 115, 22, 0.1); }
+.srv-users.partial { color: #1d4ed8; border-color: #93b4ff; background: rgba(37, 99, 235, 0.09); }
+
+.srv-snr {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.sdd-empty {
+  padding: 22px;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.main {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 32vw, 470px);
+  gap: 12px;
+}
+
+.prop-panel {
+  min-height: 320px;
+}
+
+.prop-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 10px;
+  padding: 10px;
+}
+
+.prop-map-wrap {
+  min-height: 0;
+  border: 1px solid #1a3150;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #051122;
+}
+
+#prop-map {
+  width: 100%;
+  height: 100%;
+  min-height: 270px;
+  display: block;
+}
+
+.prop-side {
+  min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, var(--surface2));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.prop-kv {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 9px;
+  border-bottom: 1px solid var(--border);
+}
+
+.prop-kv-item {
+  border: 1px solid #e4ecf8;
+  border-radius: 8px;
+  background: #fff;
+  padding: 6px 7px;
+}
+
+.prop-kv-lbl {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.prop-kv-val {
+  margin-top: 2px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent3);
+}
+
+.prop-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prop-row {
+  border: 1px solid #e3ebf8;
+  border-radius: 9px;
+  background: #fff;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.prop-row-main {
+  min-width: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prop-row-meta {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
+.prop-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.prop-header-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.sidebar .prop-panel {
+  flex: 0 0 250px;
+  min-height: 250px;
+}
+
+.sidebar .prop-panel .panel-header {
+  padding: 10px 12px;
+}
+
+.sidebar .prop-layout {
+  grid-template-columns: 1fr;
+  padding: 8px;
+}
+
+.sidebar .prop-map-wrap {
+  min-height: 0;
+}
+
+.sidebar #prop-map {
+  min-height: 170px;
+  height: 170px;
+}
+
+.sidebar .prop-side {
+  display: none;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.06);
+}
+
+.panel-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #ffffff, var(--surface2));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-bright);
+}
+
+.viz-area {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+canvas.viz {
+  width: 100%;
+  background: #041224;
+  border: 1px solid #1a3150;
+  border-radius: 10px;
+  display: block;
+}
+
+.sstv-display {
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+#sstv-canvas {
+  image-rendering: pixelated;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border: 1px solid #1d3559;
+  border-radius: 12px;
+  background: #000;
+  box-shadow: 0 14px 34px rgba(2, 8, 23, 0.25);
+  display: block;
+}
+
+.sstv-overlay {
+  position: absolute;
+  inset: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  pointer-events: none;
+  border: 1px dashed #ced8e8;
+  border-radius: 12px;
+  background: rgba(248, 251, 255, 0.6);
+}
+
+.sstv-overlay.hidden { display: none; }
+
+.sstv-waiting-icon {
+  font-size: 42px;
+  filter: saturate(0.8);
+}
+
+.sstv-waiting-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
+.sstv-waiting-sub {
+  max-width: 380px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.scan-progress-wrap {
+  width: 100%;
+  padding: 0 12px 10px;
+  display: none;
+  flex-shrink: 0;
+}
+
+.scan-progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: #dbe6f6;
+  overflow: hidden;
+}
+
+.scan-progress-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0f766e, #14b8a6, #22c55e);
+  transition: width 0.14s ease;
+}
+
+.scan-info {
+  margin-top: 6px;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.mode-info {
+  padding: 12px 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+}
+
+.mode-row {
+  display: grid;
+  grid-template-columns: minmax(98px, 44%) minmax(0, 56%);
+  align-items: start;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.mode-row:last-child { border-bottom: none; }
+
+.mode-key {
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+.mode-val {
+  color: var(--text-bright);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mode-val.detected { color: var(--accent); font-weight: 700; }
+
+.squelch-slider-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.squelch-slider {
+  width: 130px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  accent-color: #2563eb;
+}
+
+.squelch-slider:focus {
+  box-shadow: none;
+}
+
+.level-bar {
+  width: 112px;
+  height: 7px;
+  border-radius: 99px;
+  border: 1px solid #c9d6ea;
+  background: #f2f6fd;
+  position: relative;
+  overflow: hidden;
+}
+
+.level-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: linear-gradient(90deg, #2563eb, #22c55e, #f97316);
+  transition: width 0.1s linear;
+}
+
+.gallery {
+  padding: 10px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 8px;
+}
+
+.gallery-thumb {
+  width: 98px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.gallery-thumb:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.1);
+}
+
+.gallery-thumb img {
+  width: 98px;
+  display: block;
+  image-rendering: pixelated;
+}
+
+.gallery-thumb-info {
+  padding: 4px 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  background: var(--surface2);
+}
+
+.gallery-empty {
+  width: 100%;
+  padding: 20px 10px;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 9px 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(13, 24, 41, 0.52);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  width: 700px;
+  max-width: calc(100vw - 28px);
+  max-height: 84vh;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: #fff;
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.28);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-bright);
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  color: var(--accent3);
+  border-color: rgba(37, 99, 235, 0.45);
+}
+
+.modal-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface2);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.diag-section {
+  margin-bottom: 16px;
+}
+
+.diag-section-title {
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid #e7edf7;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.timeline { display: flex; flex-direction: column; }
+.tl-item { display: flex; gap: 10px; align-items: flex-start; padding: 5px 0; position: relative; }
+.tl-item:not(:last-child)::after { content: ''; position: absolute; left: 5px; top: 24px; bottom: -5px; width: 1px; background: #d8e2f0; }
+.tl-dot { width: 11px; height: 11px; border-radius: 999px; border: 2px solid; margin-top: 2px; z-index: 1; }
+.tl-dot.ok { border-color: #10b981; background: #10b981; }
+.tl-dot.fail { border-color: #ef4444; background: #ef4444; }
+.tl-dot.warn { border-color: #f59e0b; background: #f59e0b; }
+.tl-dot.pending { border-color: #9aa8be; background: transparent; }
+.tl-content { flex: 1; }
+.tl-label { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text-bright); }
+.tl-detail { margin-top: 2px; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--text-dim); line-height: 1.5; }
+
+.error-card {
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.error-code {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 4px;
+}
+
+.error-meaning {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  color: var(--text-bright);
+  margin-bottom: 5px;
+}
+
+.error-cause {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-line;
+}
+
+.fix-list { display: flex; flex-direction: column; gap: 8px; }
+.fix-item { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; border: 1px solid var(--border); background: #fff; font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: var(--text); line-height: 1.6; }
+.fix-num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; color: var(--accent3); }
+.fix-text strong { color: var(--text-bright); }
+.fix-text code { background: #f1f5ff; padding: 1px 4px; border-radius: 4px; color: #1d4ed8; font-size: 10px; }
+.fix-link { color: #1d4ed8; text-decoration: underline; }
+
+.raw-log {
+  max-height: 140px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 8px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  line-height: 1.8;
+}
+
+.conn-summary {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conn-url {
+  flex: 1;
+  word-break: break-all;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #1d4ed8;
+}
+
+.conn-duration {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.log-line { display: flex; gap: 8px; }
+.log-ts { color: var(--text-dim); flex-shrink: 0; }
+.log-msg-ok { color: #0d9488; }
+.log-msg-err { color: #dc2626; }
+.log-msg-info { color: #1d4ed8; }
+.log-msg-warn { color: #d97706; }
+
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 72px;
+  z-index: 9999;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  background: #ffffff;
+  color: #1d4ed8;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  animation: toastIn 0.2s ease;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+#preparing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(37, 99, 235, 0.16), transparent 45%),
+    radial-gradient(circle at 80% 10%, rgba(15, 118, 110, 0.17), transparent 45%),
+    #eef3f9;
+}
+
+#preparing-overlay .prep-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-bright);
+}
+
+#preparing-overlay .prep-sub {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+#preparing-overlay .prep-bar {
+  width: 280px;
+  height: 8px;
+  border-radius: 999px;
+  background: #d7e1ef;
+  overflow: hidden;
+  position: relative;
+}
+
+#preparing-overlay .prep-fill {
+  position: absolute;
+  left: -50%;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #2563eb, transparent);
+  animation: prepScan 1.2s linear infinite;
+}
+
+@keyframes prepScan {
+  to { left: 100%; }
+}
+
+#preparing-overlay .prep-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+@keyframes fadeOut {
+  to { opacity: 0; pointer-events: none; }
+}
+
+@media (max-width: 1200px) {
+  .controls {
+    grid-template-columns: minmax(300px, 1.9fr) minmax(120px, 0.8fr) minmax(140px, 0.95fr) auto auto;
+  }
+  .main { grid-template-columns: minmax(0, 1fr) 350px; }
+  .prop-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+}
+
+@media (min-width: 1800px) {
+  .main { grid-template-columns: minmax(0, 1.28fr) clamp(390px, 22vw, 560px); }
+  .prop-layout { grid-template-columns: minmax(0, 1fr) 420px; }
+}
+
+@media (max-width: 980px) {
+  .app { padding: 12px; gap: 10px; }
+
+  header {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .header-stats { order: 3; width: 100%; justify-content: flex-start; }
+
+  .controls {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .controls > .btn {
+    width: 100%;
+  }
+
+  .main {
+    grid-template-columns: 1fr;
+  }
+
+  .prop-layout {
+    grid-template-columns: 1fr;
+  }
+
+  footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .logo-main { font-size: 28px; }
+  .logo-sub { font-size: 10px; }
+
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .ctrl-group.server-picker-wrap {
+    grid-column: auto !important;
+  }
+
+  .stat-val { font-size: 18px; }
+  .mode-info { font-size: 10px; }
+  .panel-title { font-size: 11px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Preparing overlay — dismissed once server list is ready -->
+<div id="preparing-overlay">
+  <div class="prep-logo">SSTVRx</div>
+  <div class="prep-sub">SLOW SCAN TV DECODER · 14.230 MHz</div>
+  <div class="prep-bar"><div class="prep-fill"></div></div>
+  <div class="prep-status" id="prep-status">Loading receiver list…</div>
+</div>
+
+<div class="app">
+
+<!-- Header -->
+<header>
+  <div>
+    <div class="logo-main">SSTVRx</div>
+    <div class="logo-sub">Slow Scan TV Decoder · 14.230 MHz · KiwiSDR</div>
+  </div>
+  <div class="header-stats">
+    <div class="stat">
+      <div class="stat-val" id="img-count">0</div>
+      <div class="stat-lbl">Images</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="mode-display">—</div>
+      <div class="stat-lbl">Mode</div>
+    </div>
+  </div>
+  <div class="status-indicator">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text">OFFLINE</span>
+  </div>
+</header>
+
+<!-- Controls -->
+<div class="controls">
+  <div class="mixed-content-warn" id="mixed-content-warn">
+    ⚠ <strong>HTTPS page</strong> — browsers block unencrypted <code>ws://</code> connections. Open this file via <code>file://</code> or <code>http://</code> to connect to KiwiSDR.
+  </div>
+
+  <div class="ctrl-group server-picker-wrap" style="grid-column:1/3">
+    <label>KiwiSDR Host — <span id="server-list-status" style="color:var(--text-dim)">browse public HF receivers ▾</span></label>
+    <div style="display:flex;gap:0">
+      <input type="text" id="kiwi-host" placeholder="host:port — e.g. kiwisdr.example.com:8073" value=""
+        style="flex:1;border-right:none" oninput="onHostInput()">
+      <button class="btn" id="btn-browse" onclick="toggleServerDropdown()"
+        style="border-color:var(--border);color:var(--text-dim);padding:0 14px;font-size:16px;letter-spacing:0" title="Browse public KiwiSDRs">▾</button>
+    </div>
+    <div class="server-dropdown" id="server-dropdown" style="display:none">
+      <div class="server-dropdown-header">
+        <span class="sdd-title">PUBLIC KIWISDR HF RECEIVERS — kiwisdr.com</span>
+        <button class="sdd-refresh" id="btn-refresh-servers" onclick="loadPublicServers(true)">↺ REFRESH</button>
+      </div>
+      <div class="server-list" id="server-list-items">
+        <div class="sdd-empty">Click ↺ REFRESH to load live list</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ctrl-group">
+    <label>Frequency (kHz)</label>
+    <input type="number" id="freq" value="14230" step="0.1" min="1" max="30000">
+  </div>
+  <div class="ctrl-group">
+    <label>Mode</label>
+    <select id="rx-mode">
+      <option value="usb" selected>USB (standard for SSTV)</option>
+      <option value="lsb">LSB</option>
+      <option value="am">AM</option>
+    </select>
+  </div>
+  <button class="btn btn-success" id="btn-connect" onclick="connect()">CONNECT</button>
+  <button class="btn btn-primary" id="btn-demo" onclick="startDemo()">DEMO</button>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Left: spectrum + SSTV image -->
+  <div class="panel" style="min-height:0">
+    <div class="panel-header">
+      <span class="panel-title">SIGNAL + IMAGE</span>
+      <div style="display:flex;gap:12px;align-items:center">
+        <div id="mode-badge" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text-dim)">—</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:10px;font-family:'Share Tech Mono',monospace;color:var(--text-dim)">
+          SIG <div class="level-bar"><div class="level-fill" id="sig-bar" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="viz-area">
+      <canvas class="viz" id="spectrum" height="60"></canvas>
+      <canvas class="viz" id="waterfall" height="70"></canvas>
+    </div>
+
+    <!-- Scan progress -->
+    <div class="scan-progress-wrap" id="scan-progress-wrap">
+      <div class="scan-progress-bar"><div class="scan-progress-fill" id="scan-fill"></div></div>
+      <div class="scan-info">
+        <span id="scan-mode-label">—</span>
+        <span id="scan-pct">0%</span>
+        <span id="scan-eta">—</span>
+      </div>
+    </div>
+
+    <!-- Image display -->
+    <div class="sstv-display" id="sstv-display">
+      <div class="sstv-overlay" id="sstv-overlay">
+        <div class="sstv-waiting-icon">📺</div>
+        <div class="sstv-waiting-title">AWAITING TRANSMISSION</div>
+        <div class="sstv-waiting-sub">Connect to a KiwiSDR tuned to 14.230 MHz USB and wait for an SSTV signal. Decoder auto-detects Robot 36, Martin M1/M2, and Scottie S1/S2.</div>
+      </div>
+      <canvas id="sstv-canvas" width="320" height="240" style="display:none"></canvas>
+    </div>
+  </div>
+
+  <!-- Right: sidebar -->
+  <div class="sidebar">
+
+    <!-- Mode info -->
+    <div class="panel" style="flex:0 0 auto">
+      <div class="panel-header">
+        <span class="panel-title">DECODER STATUS</span>
+        <button class="btn btn-compact btn-toggle" id="btn-auto-squelch" onclick="toggleAutoSquelch()">AUTO SQUELCH OFF</button>
+      </div>
+      <div class="mode-info">
+        <div class="mode-row"><span class="mode-key">FREQ</span><span class="mode-val" id="mi-freq">14.230 MHz USB</span></div>
+        <div class="mode-row"><span class="mode-key">SSTV MODE</span><span class="mode-val" id="mi-mode">Scanning…</span></div>
+        <div class="mode-row"><span class="mode-key">STATE</span><span class="mode-val" id="mi-state">Waiting for VIS code</span></div>
+        <div class="mode-row"><span class="mode-key">VIS CODE</span><span class="mode-val" id="mi-vis">—</span></div>
+        <div class="mode-row"><span class="mode-key">IMAGE SIZE</span><span class="mode-val" id="mi-size">—</span></div>
+        <div class="mode-row"><span class="mode-key">LINE TIME</span><span class="mode-val" id="mi-linetime">—</span></div>
+        <div class="mode-row"><span class="mode-key">LIVE FREQ</span><span class="mode-val" id="mi-livefreq">— Hz</span></div>
+        <div class="mode-row"><span class="mode-key">FREQ (30ms avg)</span><span class="mode-val" id="mi-avgfreq">— Hz</span></div>
+        <div class="mode-row"><span class="mode-key">SNR</span><span class="mode-val" id="mi-snr">—</span></div>
+        <div class="mode-row"><span class="mode-key">AUTO SQUELCH</span><span class="mode-val" id="mi-squelch">Off</span></div>
+        <div class="mode-row">
+          <span class="mode-key">SQUELCH LEVEL</span>
+          <span class="mode-val">
+            <span class="squelch-slider-wrap">
+              <input class="squelch-slider" id="squelch-level" type="range" min="-120" max="-50" step="1" value="-95" oninput="onSquelchLevelInput(this.value)">
+              <span id="mi-squelch-level">-95 dBm</span>
+            </span>
+          </span>
+        </div>
+        <div class="mode-row"><span class="mode-key">SAMPLE RATE</span><span class="mode-val" id="mi-sr">—</span></div>
+      </div>
+    </div>
+
+    <!-- Tone legend -->
+    <div class="panel" style="flex:0 0 auto">
+      <div class="panel-header"><span class="panel-title">SSTV TONE MAP</span></div>
+      <div style="padding:10px;font-family:'Share Tech Mono',monospace;font-size:10px;line-height:2">
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,26,74,.4);padding-bottom:4px;margin-bottom:4px">
+          <span style="color:var(--text-dim)">SYNC PULSE</span><span style="color:var(--accent3)">1200 Hz</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-dim)">BLACK</span><span style="color:var(--text-dim)">1500 Hz</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-dim)">GREY</span><span style="color:var(--text-dim)">1900 Hz</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-dim)">WHITE</span><span style="color:var(--accent2)">2300 Hz</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;border-top:1px solid rgba(42,26,74,.4);padding-top:4px;margin-top:4px">
+          <span style="color:var(--text-dim)">VIS START</span><span style="color:var(--accent)">1900 Hz · 300ms</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-dim)">VIS BIT 0</span><span style="color:var(--accent)">1300 Hz · 30ms</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text-dim)">VIS BIT 1</span><span style="color:var(--accent)">1100 Hz · 30ms</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Received gallery -->
+    <div class="panel" style="flex:1;min-height:180px">
+      <div class="panel-header">
+        <span class="panel-title">RECEIVED IMAGES</span>
+        <button class="btn" style="padding:2px 8px;font-size:9px;border-color:var(--border);color:var(--text-dim)" onclick="clearGallery()">CLEAR</button>
+      </div>
+      <div class="gallery" id="gallery">
+        <div class="gallery-empty" id="gallery-empty">No images received yet</div>
+      </div>
+    </div>
+
+    <!-- 20m propagation -->
+    <div class="panel prop-panel">
+      <div class="panel-header">
+        <span class="panel-title">20M PROPAGATION</span>
+        <div class="prop-header-actions">
+          <span class="prop-status" id="prop-status">Loading…</span>
+          <button class="btn btn-compact" style="border-color:var(--border);color:var(--text-dim)" onclick="refreshPropagation(true)">REFRESH</button>
+        </div>
+      </div>
+      <div class="prop-layout">
+        <div class="prop-map-wrap">
+          <canvas id="prop-map" width="760" height="220"></canvas>
+        </div>
+        <div class="prop-side">
+          <div class="prop-kv">
+            <div class="prop-kv-item">
+              <div class="prop-kv-lbl">SPOTS</div>
+              <div class="prop-kv-val" id="prop-spots">0</div>
+            </div>
+            <div class="prop-kv-item">
+              <div class="prop-kv-lbl">LINKS</div>
+              <div class="prop-kv-val" id="prop-links">0</div>
+            </div>
+            <div class="prop-kv-item">
+              <div class="prop-kv-lbl">GRIDS</div>
+              <div class="prop-kv-val" id="prop-grids">0</div>
+            </div>
+          </div>
+          <div class="prop-list" id="prop-list">
+            <div class="sdd-empty">Waiting for propagation data…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Footer -->
+<footer>
+  <div>SSTVRx · Robot 36 · Martin M1/M2 · Scottie S1/S2 · 14.230 MHz USB · KiwiSDR</div>
+  <div id="footer-info">KiwiSDR: disconnected</div>
+</footer>
+
+</div><!-- .app -->
+
+<script>
+'use strict';
+// ============================================================
+//  SSTV Mode Definitions
+// ============================================================
+const SSTV_MODES = {
+  0x08: { name:'Robot 36',   vis:0x08, w:320, h:240, colorEnc:'YCbCr', lineMs:150,    syncMs:9,     porchMs:3,    pixelMs:0.4320, type:'robot36'  },
+  0x0C: { name:'Robot 72',   vis:0x0C, w:320, h:240, colorEnc:'YCbCr', lineMs:300,    syncMs:9,     porchMs:3,    pixelMs:0.8640, type:'robot72'  },
+  0x2C: { name:'Martin M1',  vis:0x2C, w:320, h:256, colorEnc:'RGB',   lineMs:446.45, syncMs:4.862, porchMs:0.572,pixelMs:0.4576, type:'martin'   },
+  0x28: { name:'Martin M2',  vis:0x28, w:320, h:256, colorEnc:'RGB',   lineMs:226.79, syncMs:4.862, porchMs:0.572,pixelMs:0.2288, type:'martin'   },
+  0x3C: { name:'Scottie S1', vis:0x3C, w:320, h:256, colorEnc:'RGB',   lineMs:428.22, syncMs:9,     porchMs:1.5,  pixelMs:0.4320, type:'scottie'  },
+  0x38: { name:'Scottie S2', vis:0x38, w:320, h:256, colorEnc:'RGB',   lineMs:277.69, syncMs:9,     porchMs:1.5,  pixelMs:0.2752, type:'scottie'  },
+  0x3F: { name:'Scottie DX', vis:0x3F, w:320, h:256, colorEnc:'RGB',   lineMs:1050,   syncMs:9,     porchMs:1.5,  pixelMs:1.0800, type:'scottie'  },
+};
+
+const SSTV_SYNC_HZ  = 1200;
+const SSTV_BLACK_HZ = 1500;
+const SSTV_WHITE_HZ = 2300;
+const SAMPLE_RATE   = 12000;
+
+// ============================================================
+//  SSTV Demodulator  — FM discriminator + sample-counting FSM
+// ============================================================
+class SSTVDemodulator {
+  constructor(sampleRate) {
+    this.sr = sampleRate;
+
+    // ── FIR Hilbert transform → analytic signal → instantaneous frequency ──
+    // Standard 63-tap windowed-sinc Hilbert FIR, designed for 900–4000 Hz at fs=12000.
+    // Odd taps only (even taps are 0 for Hilbert FIR).
+    // h[n] = (2/π·n) · window[n]  for odd n, 0 for even n
+    // Using Hann window for good sidelobe suppression.
+    const N = 63;  // must be odd
+    const M = (N - 1) / 2;  // centre tap index = 31
+    this._htaps = new Float32Array(N);
+    for (let n = 0; n < N; n++) {
+      const k = n - M;
+      if (k !== 0 && k % 2 !== 0) {
+        const hann = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / (N - 1));
+        this._htaps[n] = (2 / (Math.PI * k)) * hann;
+      }
+    }
+    // Delay line for real signal (length N) and for I (the M-sample delayed real)
+    this._hbuf = new Float32Array(N);  // circular buffer for Hilbert FIR
+    this._hpos = 0;
+    // Previous analytic sample for phase differencing
+    this._pI = 0;
+    this._pQ = 0;
+
+    // ── Frequency ring buffer (1 s) ────────────────────────
+    const BUFLEN = sampleRate;
+    this._fBuf  = new Float32Array(BUFLEN);
+    this._fHead = 0;
+    this._fLen  = BUFLEN;
+    this._fFill = 0;
+    this._sIdx  = 0;
+
+    // ── State machine ──────────────────────────────────────
+    this.state = 'IDLE';
+    this.mode  = null;
+
+    // IDLE: leader tone detection (1900 Hz ±100 Hz for ≥300ms)
+    this._leaderCount  = 0;
+    this._leaderNeeded = Math.round(sampleRate * 0.20);
+    this._leaderHzEst  = 1900;
+    this._idleLeaderCount = 0;
+    this._idleBreakCount  = 0;
+    this._idlePreambleAge = 0;
+    this._idlePreambleArmed = false;
+    this._idleLeaderHz = 1900;
+
+    // VIS: bit collection
+    this._visBreakCount  = 0;
+    this._visBreak2Count = 0;
+    this._visBreak2Acc   = 0;
+    this._visBreak2Gap   = 0;
+    this._visBreakAge    = 0;
+    this._visBreak2Age   = 0;
+    this._leader2Count   = 0;
+    this._visBitAcc      = 0;
+    this._visBitN        = 0;
+    this._visBitsArr     = [];
+    this._visBitAvgArr   = [];
+    this._visStopN       = 0;
+    this._visStopAcc     = 0;
+    this._pendingVIS     = 0;
+    this._visBitLen      = Math.round(sampleRate * 0.030);
+
+    // SCAN
+    this.canvas    = document.getElementById('sstv-canvas');
+    this.ctx       = this.canvas.getContext('2d');
+    this.imageData = null;
+    this.lineNum   = 0;
+    this._lineSampleCount = 0;
+    this._lineRGB  = null;
+    this._lineY    = null;
+    this._lineC    = null;
+    this._prevCb   = 0;
+    this._prevCr   = 0;
+    this._toneOffset = 0;
+
+    // SCAN preamble preemption (new transmission while image in progress)
+    this._scanHdrLeaderCount = 0;
+    this._scanHdrBreakCount  = 0;
+    this._scanHdrAge         = 0;
+    this._scanHdrArmed       = false;
+    this._scanHdrLeaderHz    = 1900;
+
+    this._resetIdlePreambleDetector();
+  }
+
+  // ── Public API ─────────────────────────────────────────────
+  processSamples(samples) {
+    for (let i = 0; i < samples.length; i++) {
+      const freq = this._instantFreq(samples[i]);
+      this._fBuf[this._fHead] = freq;
+      this._fHead = (this._fHead + 1) % this._fLen;
+      if (this._fFill < this._fLen) this._fFill++;
+      this._tick(freq);
+      this._sIdx++;
+    }
+    // Update live freq display every call (throttled by audio frame rate ~100ms)
+    const lf = this._avgFreqMs(8);
+    const af = this._avgFreqMs(30);
+    const lEl = document.getElementById('mi-livefreq');
+    const aEl = document.getElementById('mi-avgfreq');
+    if (lEl) lEl.textContent = lf.toFixed(0) + ' Hz';
+    if (aEl) aEl.textContent = af.toFixed(0) + ' Hz  [state: ' + this.state + ']';
+  }
+
+  // ── Proper Hilbert-transform FM discriminator ───────────────
+  // Step 1: FIR Hilbert gives Q (90° phase shift of real input)
+  // Step 2: I = real input delayed by M samples (centre tap)
+  // Step 3: freq = atan2(I[n]·Q[n-1] - Q[n]·I[n-1], I[n]·I[n-1] + Q[n]·Q[n-1]) · fs/2π
+  _instantFreq(x) {
+    const N = this._htaps.length;
+    const M = (N - 1) >> 1;  // 31
+
+    // Write new sample into circular buffer
+    this._hbuf[this._hpos] = x;
+
+    // Compute Q: dot product of taps with circular buffer
+    let Q = 0;
+    for (let k = 0; k < N; k++) {
+      const idx = (this._hpos - k + N) % N;
+      Q += this._htaps[k] * this._hbuf[idx];
+    }
+
+    // I = x delayed by M samples
+    const I = this._hbuf[(this._hpos - M + N) % N];
+
+    this._hpos = (this._hpos + 1) % N;
+
+    // Phase difference between consecutive analytic samples → frequency
+    // Δφ = arg( (I+jQ) · conj(pI+jpQ) ) = arg( (I·pI+Q·pQ) + j(Q·pI-I·pQ) )
+    const re = I * this._pI + Q * this._pQ;
+    const im = Q * this._pI - I * this._pQ;
+    const dph = Math.atan2(im, re + 1e-12);
+    const hz  = dph * this.sr / (2 * Math.PI);
+
+    this._pI = I;
+    this._pQ = Q;
+
+    // Clamp to SSTV range
+    return Math.max(900, Math.min(2600, hz));
+  }
+
+  // ── Average of last N ms from ring buffer ──
+  _avgFreqMs(ms) {
+    const n = Math.min(Math.round(ms * this.sr / 1000), this._fFill);
+    if (n === 0) return 1750;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const idx = ((this._fHead - 1 - i) % this._fLen + this._fLen) % this._fLen;
+      sum += this._fBuf[idx];
+    }
+    return sum / n;
+  }
+
+  _freqToLuma(hz) {
+    return Math.round(Math.max(0, Math.min(255, (hz - (1500 + this._toneOffset)) / 800 * 255)));
+  }
+
+  // Short-window average from ring buffer — key to robust tone detection
+  _avgLast(ms) {
+    const n = Math.min(Math.round(ms * this.sr / 1000), this._fFill);
+    if (n === 0) return 1750;
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const idx = ((this._fHead - 1 - i) % this._fLen + this._fLen) % this._fLen;
+      sum += this._fBuf[idx];
+    }
+    return sum / n;
+  }
+
+  _toneStats(ms) {
+    const n = Math.min(Math.round(ms * this.sr / 1000), this._fFill);
+    if (n < 4) return null;
+
+    let sum = 0;
+    for (let i = 0; i < n; i++) {
+      const idx = ((this._fHead - 1 - i) % this._fLen + this._fLen) % this._fLen;
+      sum += this._fBuf[idx];
+    }
+    const avg = sum / n;
+
+    let varSum = 0;
+    for (let i = 0; i < n; i++) {
+      const idx = ((this._fHead - 1 - i) % this._fLen + this._fLen) % this._fLen;
+      const d = this._fBuf[idx] - avg;
+      varSum += d * d;
+    }
+    const std = Math.sqrt(varSum / n);
+    return { avg, std, n };
+  }
+
+  _toneNear(ms, targetHz, tolHz, maxStdHz) {
+    const s = this._toneStats(ms);
+    if (!s) return false;
+    if (Math.abs(s.avg - targetHz) > tolHz) return false;
+    return s.std <= maxStdHz;
+  }
+
+  _toneAvgNear(ms, targetHz, tolHz) {
+    const s = this._toneStats(ms);
+    if (!s) return false;
+    return Math.abs(s.avg - targetHz) <= tolHz;
+  }
+
+  _breakToneDetected(ms = 6) {
+    // Break is nominally 1200 Hz. Use avg/std once (faster + less jittery than
+    // repeated _toneNear calls) and tolerate moderate HF wobble.
+    const s = this._toneStats(ms);
+    if (!s) return false;
+    const targetA = 1200 + this._toneOffset;
+    const targetB = 1200 + Math.max(-160, Math.min(160, this._toneOffset));
+    const near =
+      Math.abs(s.avg - targetA) <= 310 ||
+      Math.abs(s.avg - targetB) <= 280 ||
+      Math.abs(s.avg - 1200) <= 240;
+    if (!near) return false;
+    return s.std <= 430;
+  }
+
+  _visBitsToCode(bits) {
+    let vis = 0;
+    for (let b = 0; b < 7; b++) vis |= ((bits[b] || 0) << b);
+    return vis & 0x7F;
+  }
+
+  _visParityOk(bits) {
+    const ones = bits.slice(0, 7).reduce((a, b) => a + (b ? 1 : 0), 0);
+    const parityBit = bits[7] ? 1 : 0;
+    return (ones % 2) === parityBit;
+  }
+
+  _scoreVisCandidate(bits, avgs) {
+    const vis = this._visBitsToCode(bits);
+    const parityOk = this._visParityOk(bits);
+    const known = !!SSTV_MODES[vis];
+    const spread = (Math.max(...avgs) - Math.min(...avgs));
+    let score = 0;
+    if (known) score += 8;
+    if (parityOk) score += 3;
+    if (spread >= 70) score += 1;
+    if (vis === 0x00 && !known) score -= 1;
+    return { bits, vis, parityOk, known, score, spread };
+  }
+
+  _selectVisCandidate(bitAvgs) {
+    if (!bitAvgs || bitAvgs.length !== 8) return null;
+    const thrBase = 1200 + this._toneOffset;
+    const minHz = Math.min(...bitAvgs);
+    const maxHz = Math.max(...bitAvgs);
+    const thrDyn = (minHz + maxHz) * 0.5;
+    const bitsBase = bitAvgs.map(v => (v < thrBase ? 1 : 0));
+    const bitsDyn  = bitAvgs.map(v => (v < thrDyn  ? 1 : 0));
+    const inv = bits => bits.map(b => b ? 0 : 1);
+
+    const uniq = new Map();
+    for (const bits of [bitsBase, bitsDyn, inv(bitsBase), inv(bitsDyn)]) {
+      const k = bits.join('');
+      if (!uniq.has(k)) uniq.set(k, bits);
+    }
+    const scored = [...uniq.values()].map(bits => this._scoreVisCandidate(bits, bitAvgs));
+    scored.sort((a, b) => b.score - a.score);
+    if (!scored.length) return null;
+
+    const best = scored[0];
+    const next = scored[1];
+    // Reject only clearly ambiguous and unknown results.
+    if (next && best.score === next.score && !best.known && !next.known) return null;
+    if (best.spread < 40 && !best.known) return null;
+    return best;
+  }
+
+  _resetScanHeaderDetector() {
+    this._scanHdrLeaderCount = 0;
+    this._scanHdrBreakCount  = 0;
+    this._scanHdrAge         = 0;
+    this._scanHdrArmed       = false;
+    this._scanHdrLeaderHz    = 1900 + this._toneOffset;
+  }
+
+  _scanDetectNewPreamble() {
+    const leaderStats = this._toneStats(18);
+    const leaderOk = !!leaderStats && leaderStats.avg > 1550 && leaderStats.avg < 2350 && leaderStats.std < 300;
+    const breakOk  = this._breakToneDetected(6);
+
+    if (!this._scanHdrArmed) {
+      if (leaderOk) {
+        this._scanHdrLeaderCount++;
+        if (this._scanHdrLeaderCount === 1) this._scanHdrLeaderHz = leaderStats.avg;
+        else this._scanHdrLeaderHz = this._scanHdrLeaderHz * 0.92 + leaderStats.avg * 0.08;
+      } else {
+        this._scanHdrLeaderCount = Math.max(0, this._scanHdrLeaderCount - 12);
+      }
+      if (this._scanHdrLeaderCount >= Math.round(this.sr * 0.16)) {
+        this._scanHdrArmed = true;
+        this._scanHdrAge = 0;
+        this._scanHdrBreakCount = 0;
+      }
+      return false;
+    }
+
+    this._scanHdrAge++;
+    if (breakOk) this._scanHdrBreakCount++;
+    else if (leaderOk) this._scanHdrBreakCount = Math.max(0, this._scanHdrBreakCount - 4);
+    else this._scanHdrBreakCount = Math.max(0, this._scanHdrBreakCount - 18);
+
+    if (this._scanHdrBreakCount >= Math.round(this.sr * 0.008)) {
+      this._toneOffset = Math.max(-350, Math.min(350, this._scanHdrLeaderHz - 1900));
+      this._resetScanHeaderDetector();
+      return true;
+    }
+    if (this._scanHdrAge > Math.round(this.sr * 0.50)) {
+      this._resetScanHeaderDetector();
+    }
+    return false;
+  }
+
+  _resetIdlePreambleDetector() {
+    this._idleLeaderCount = 0;
+    this._idleBreakCount = 0;
+    this._idlePreambleAge = 0;
+    this._idlePreambleArmed = false;
+    this._idleLeaderHz = 1900 + this._toneOffset;
+  }
+
+  _idleDetectPreamble() {
+    const leaderStats = this._toneStats(16);
+    const leaderOk = !!leaderStats &&
+      leaderStats.avg > 1660 &&
+      leaderStats.avg < 2140 &&
+      leaderStats.std < 360;
+    const breakOk = this._breakToneDetected(6);
+
+    if (!this._idlePreambleArmed) {
+      if (leaderOk) {
+        this._idleLeaderCount++;
+        if (this._idleLeaderCount === 1) this._idleLeaderHz = leaderStats.avg;
+        else this._idleLeaderHz = this._idleLeaderHz * 0.90 + leaderStats.avg * 0.10;
+      } else {
+        this._idleLeaderCount = Math.max(0, this._idleLeaderCount - 8);
+      }
+      if (this._idleLeaderCount >= Math.round(this.sr * 0.14)) {
+        this._idlePreambleArmed = true;
+        this._idlePreambleAge = 0;
+        this._idleBreakCount = 0;
+      }
+      return false;
+    }
+
+    this._idlePreambleAge++;
+    if (breakOk) this._idleBreakCount++;
+    else if (leaderOk) this._idleBreakCount = Math.max(0, this._idleBreakCount - 3);
+    else this._idleBreakCount = Math.max(0, this._idleBreakCount - 14);
+
+    if (this._idleBreakCount >= Math.round(this.sr * 0.006)) {
+      this._toneOffset = Math.max(-350, Math.min(350, this._idleLeaderHz - 1900));
+      this._resetIdlePreambleDetector();
+      return true;
+    }
+    if (this._idlePreambleAge > Math.round(this.sr * 0.65)) {
+      this._resetIdlePreambleDetector();
+    }
+    return false;
+  }
+
+  // ── Per-sample state machine ────────────────────────────────
+  // Per-sample freq is noisy — decisions use _avgLast() at key transitions.
+  // Count-based accumulation is tolerant of individual noisy samples.
+  _tick(freq) {
+    if (this.state !== 'IDLE' && (this._idlePreambleArmed || this._idleLeaderCount || this._idleBreakCount)) {
+      this._resetIdlePreambleDetector();
+    }
+
+    switch (this.state) {
+
+      // ── IDLE: hunt for 1900 Hz leader (≥300ms) ─────────────
+      case 'IDLE': {
+        if (this._idleDetectPreamble()) {
+          this.state           = 'VIS_LEADER2';
+          this._leader2Count   = Math.round(this.sr * 0.04);
+          this._visBreakCount  = 0;
+          this._visBreak2Count = 0;
+          this._visBreak2Gap   = 0;
+          this._visBreakAge    = 0;
+          this._visBreak2Age   = 0;
+          this._visBitAvgArr   = [];
+          this._leaderCount    = 0;
+          updateDecoderState('Preamble ✓ — waiting for 2nd leader…', null);
+          break;
+        }
+
+        const s = this._toneStats(18);
+        const plausibleLeader = !!s && s.avg > 1660 && s.avg < 2140 && s.std < 340;
+        if (plausibleLeader) {
+          if (this._leaderCount === 0) this._leaderHzEst = s.avg;
+          else this._leaderHzEst = this._leaderHzEst * 0.92 + s.avg * 0.08;
+          this._leaderCount++;
+          if (this._leaderCount >= this._leaderNeeded) {
+            // Confirm with a longer stable window.
+            if (this._toneNear(36, this._leaderHzEst, 280, 320)) {
+              this._toneOffset = Math.max(-350, Math.min(350, this._leaderHzEst - 1900));
+              this.state          = 'VIS_BREAK';
+              this._leaderCount   = 0;
+              this._visBreakCount = 0;
+              this._visBreakAge   = 0;
+              updateDecoderState('VIS leader ✓ — waiting for 1200 Hz break…', null);
+            }
+          }
+        } else {
+          // Decay slowly so brief fades don't force a full re-acquire.
+          this._leaderCount = Math.max(0, this._leaderCount - 6);
+          if (this._leaderCount === 0) this._leaderHzEst = 1900 + this._toneOffset;
+        }
+        break;
+      }
+
+      // ── VIS_BREAK: 10ms at 1200 Hz ──────────────────────────
+      case 'VIS_BREAK': {
+        this._visBreakAge++;
+        if (this._breakToneDetected(8)) {
+          this._visBreakCount++;
+          if (this._visBreakCount >= Math.round(this.sr * 0.008)) {
+            this.state         = 'VIS_LEADER2';
+            this._leader2Count = 0;
+            this._visBreakAge  = 0;
+            updateDecoderState('Break ✓ — 2nd leader…', null);
+          }
+        } else if (this._toneNear(18, 1900 + this._toneOffset, 270, 340)) {
+          this._visBreakCount = 0;
+        } else {
+          this._visBreakCount = Math.max(0, this._visBreakCount - 8);
+        }
+        if (this._visBreakAge >= Math.round(this.sr * 0.55)) {
+          this.state = 'IDLE'; this._leaderCount = 0; this._visBreakAge = 0;
+          updateDecoderState('No break detected — scanning for VIS leader…', null);
+        }
+        break;
+      }
+      // ── VIS_LEADER2: 300ms at 1900 Hz ────────────────────────
+      case 'VIS_LEADER2': {
+        if (this._toneNear(18, 1900 + this._toneOffset, 260, 330)) {
+          this._leader2Count++;
+          if (this._leader2Count >= Math.round(this.sr * 0.24)) {
+            this.state           = 'VIS_BREAK2';
+            this._visBreak2Count = 0;
+            this._visBreak2Acc   = 0;
+            this._visBreak2Gap   = 0;
+            this._visBreak2Age   = 0;
+          }
+        } else if (this._toneNear(10, 1200 + this._toneOffset, 260, 320)) {
+          // Early start-bit arrival: move ahead and seed some count.
+          this.state           = 'VIS_BREAK2';
+          this._visBreak2Count = Math.round(this.sr * 0.010);
+          this._visBreak2Acc   = freq * this._visBreak2Count;
+          this._visBreak2Gap   = 0;
+          this._visBreak2Age   = 0;
+          updateDecoderState('Start bit…', null);
+        } else {
+          this._leader2Count = Math.max(0, this._leader2Count - 10);
+          if (this._leader2Count === 0) {
+            this.state = 'IDLE'; this._leaderCount = 0;
+            updateDecoderState('2nd leader lost — scanning for VIS leader…', null);
+          }
+        }
+        break;
+      }
+      // ── VIS_START: 30ms start bit at 1200 Hz ────────────────
+      case 'VIS_BREAK2': {
+        this._visBreak2Age++;
+        if (this._breakToneDetected(8)) {
+          this._visBreak2Gap = 0;
+          this._visBreak2Count++;
+          this._visBreak2Acc += freq;
+          if (this._visBreak2Count >= this._visBitLen) {
+            // Recalibrate tone offset from measured 1200 Hz start bit.
+            const startHz = this._visBreak2Acc / Math.max(1, this._visBreak2Count);
+            if (startHz < 980 || startHz > 1420) {
+              this.state = 'IDLE';
+              this._leaderCount = 0;
+              this._visBreak2Age = 0;
+              updateDecoderState('Start bit out of range — scanning for VIS leader…', null);
+              break;
+            }
+            this._toneOffset = Math.max(-220, Math.min(220, startHz - 1200));
+            this.state       = 'VIS_BITS';
+            this._visBitsArr = [];
+            this._visBitAvgArr = [];
+            this._visBitAcc  = 0;
+            this._visBitN    = 0;
+            this._visBreak2Age = 0;
+            updateDecoderState('Reading VIS bits…', null);
+          }
+        } else {
+          this._visBreak2Gap++;
+          if (this._visBreak2Gap >= Math.round(this.sr * 0.003)) {
+            this._visBreak2Count = 0;
+            this._visBreak2Acc   = 0;
+          }
+        }
+        if (this._visBreak2Age >= Math.round(this.sr * 0.12)) {
+          this.state = 'IDLE'; this._leaderCount = 0; this._visBreak2Age = 0;
+          updateDecoderState('Start bit timeout — scanning for VIS leader…', null);
+        }
+        break;
+      }
+      // ── VIS_BITS: 8 × 30ms ───────────────────────────────────
+      case 'VIS_BITS': {
+        this._visBitAcc += freq;
+        this._visBitN++;
+        if (this._visBitN >= this._visBitLen) {
+          const avg = this._visBitAcc / this._visBitN;
+          const bit = avg < (1200 + this._toneOffset) ? 1 : 0;
+          this._visBitsArr.push(bit);
+          this._visBitAvgArr.push(avg);
+          this._visBitAcc = 0;
+          this._visBitN   = 0;
+
+          if (this._visBitsArr.length === 8) {
+            const selected = this._selectVisCandidate(this._visBitAvgArr);
+            if (!selected) {
+              updateDecoderState('VIS decode ambiguous — scanning for VIS leader…', null);
+              this.state = 'IDLE';
+              this._leaderCount = 0;
+              break;
+            }
+            this._visBitsArr = selected.bits.slice();
+            const vis = selected.vis;
+            document.getElementById('mi-vis').textContent =
+              `0x${vis.toString(16).toUpperCase().padStart(2,'0')} bits:[${this._visBitsArr.join('')}]`;
+            this.state       = 'VIS_STOP';
+            this._visStopN   = 0;
+            this._visStopAcc = 0;
+            this._pendingVIS = vis;
+          }
+        }
+        break;
+      }
+
+      // ── VIS_STOP: 30ms stop bit ──────────────────────────────
+      case 'VIS_STOP': {
+        this._visStopN++;
+        this._visStopAcc += freq;
+        if (this._visStopN >= this._visBitLen) {
+          const stopAvg = this._visStopAcc / this._visStopN;
+          if (Math.abs(stopAvg - (1200 + this._toneOffset)) > 260) {
+            updateDecoderState('VIS framing error — resync', null);
+            this.state = 'IDLE'; this._leaderCount = 0;
+            break;
+          }
+          const vis     = this._pendingVIS;
+          const parityBit = this._visBitsArr[7] ?? 0;
+          const ones = this._visBitsArr.slice(0, 7).reduce((a, b) => a + b, 0);
+          const parityOk = (ones % 2) === parityBit;
+          if (!parityOk) {
+            const visEl = document.getElementById('mi-vis');
+            if (visEl && !visEl.textContent.includes('parity?')) visEl.textContent += ' parity?';
+          }
+          const modeDef = SSTV_MODES[vis];
+          if (modeDef) {
+            this._startImage(modeDef);
+          } else {
+            updateDecoderState(`Unknown VIS 0x${vis.toString(16).toUpperCase()} — back to scan`, null);
+            this.state = 'IDLE'; this._leaderCount = 0;
+          }
+        }
+        break;
+      }
+
+      // ── SCAN: decode scan lines ──────────────────────────────
+      case 'SCAN': {
+        if (this._scanDetectNewPreamble()) {
+          this._finaliseImage(false);
+          this.state         = 'VIS_LEADER2';
+          this._leaderCount = 0;
+          this._leader2Count = 0;
+          this._visBreakCount = 0;
+          this._visBreak2Count = 0;
+          this._visBreakAge = 0;
+          this._visBreak2Age = 0;
+          updateDecoderState('New transmission detected — waiting for 2nd leader…', null);
+          break;
+        }
+        this._decodeSample(freq);
+        break;
+      }
+    }
+  }
+
+  // ── Start receiving an image ────────────────────────────────
+  _startImage(modeDef) {
+    this.mode     = modeDef;
+    this.lineNum  = 0;
+    this.canvas.width  = modeDef.w;
+    this.canvas.height = modeDef.h;
+    this.imageData = this.ctx.createImageData(modeDef.w, modeDef.h);
+    for (let i = 3; i < this.imageData.data.length; i += 4) this.imageData.data[i] = 255;
+    this.ctx.putImageData(this.imageData, 0, 0);
+    this._lineSampleCount = 0;
+    this._lineRGB = null; this._lineY = null; this._lineC = null;
+    this._prevCb = 0; this._prevCr = 0;
+    this._resetIdlePreambleDetector();
+    this._resetScanHeaderDetector();
+    this.state = 'SCAN';
+
+    document.getElementById('sstv-canvas').style.display = 'block';
+    document.getElementById('sstv-overlay').classList.add('hidden');
+    document.getElementById('scan-progress-wrap').style.display = 'block';
+    document.getElementById('scan-mode-label').textContent = modeDef.name;
+    document.getElementById('mi-mode').textContent = modeDef.name;
+    document.getElementById('mi-mode').className   = 'mode-val detected';
+    document.getElementById('mi-size').textContent = `${modeDef.w} × ${modeDef.h}`;
+    document.getElementById('mi-linetime').textContent = `${modeDef.lineMs} ms`;
+    document.getElementById('mode-display').textContent = modeDef.name;
+    document.getElementById('mode-badge').textContent   = modeDef.name;
+    document.getElementById('mode-badge').style.color   = 'var(--accent2)';
+    updateDecoderState(`Receiving ${modeDef.name}…`, modeDef);
+  }
+
+  // ── Per-sample scan decoder ─────────────────────────────────
+  _decodeSample(freq) {
+    const m   = this.mode;
+    const sr  = this.sr;
+    const sc  = this._lineSampleCount;
+
+    function msToSamples(ms) { return Math.round(ms * sr / 1000); }
+
+    if (m.type === 'robot36') {
+      // Structure: sync(9ms) porch(3ms) Y(88ms) porch(4.5ms) C(44ms)
+      const yS  = msToSamples(m.syncMs + m.porchMs);
+      const yE  = msToSamples(m.syncMs + m.porchMs + 88.0);
+      const cS  = msToSamples(m.syncMs + m.porchMs + 88.0 + 4.5);
+      const cE  = msToSamples(m.syncMs + m.porchMs + 88.0 + 4.5 + 44.0);
+      if (!this._lineY) { this._lineY = new Uint8Array(m.w); this._lineC = new Uint8Array(m.w); }
+      if (sc >= yS && sc < yE) {
+        const px = Math.floor((sc - yS) / (yE - yS) * m.w);
+        this._lineY[Math.min(px, m.w-1)] = this._freqToLuma(freq);
+      }
+      if (sc >= cS && sc < cE) {
+        const px = Math.floor((sc - cS) / (cE - cS) * m.w);
+        this._lineC[Math.min(px, m.w-1)] = this._freqToLuma(freq);
+      }
+
+    } else if (m.type === 'martin') {
+      // sync porch G B R with porches between channels
+      const chMs = m.pixelMs * m.w;
+      const gS = msToSamples(m.syncMs + m.porchMs);
+      const gE = msToSamples(m.syncMs + m.porchMs + chMs);
+      const bS = msToSamples(m.syncMs + m.porchMs + chMs + 0.572);
+      const bE = msToSamples(m.syncMs + m.porchMs + chMs + 0.572 + chMs);
+      const rS = msToSamples(m.syncMs + m.porchMs + chMs*2 + 0.572*2);
+      const rE = msToSamples(m.syncMs + m.porchMs + chMs*2 + 0.572*2 + chMs);
+      if (!this._lineRGB) this._lineRGB = { r:new Uint8Array(m.w), g:new Uint8Array(m.w), b:new Uint8Array(m.w) };
+      if (sc >= gS && sc < gE) { const px=Math.floor((sc-gS)/(gE-gS)*m.w); this._lineRGB.g[Math.min(px,m.w-1)]=this._freqToLuma(freq); }
+      if (sc >= bS && sc < bE) { const px=Math.floor((sc-bS)/(bE-bS)*m.w); this._lineRGB.b[Math.min(px,m.w-1)]=this._freqToLuma(freq); }
+      if (sc >= rS && sc < rE) { const px=Math.floor((sc-rS)/(rE-rS)*m.w); this._lineRGB.r[Math.min(px,m.w-1)]=this._freqToLuma(freq); }
+
+    } else if (m.type === 'scottie') {
+      // porch G porch B sync porch R
+      const chMs = m.pixelMs * m.w;
+      const gS = msToSamples(1.5);
+      const gE = msToSamples(1.5 + chMs);
+      const bS = msToSamples(1.5 + chMs + 1.5);
+      const bE = msToSamples(1.5 + chMs + 1.5 + chMs);
+      const rS = msToSamples(1.5 + chMs + 1.5 + chMs + m.syncMs + 1.5);
+      const rE = msToSamples(1.5 + chMs + 1.5 + chMs + m.syncMs + 1.5 + chMs);
+      if (!this._lineRGB) this._lineRGB = { r:new Uint8Array(m.w), g:new Uint8Array(m.w), b:new Uint8Array(m.w) };
+      if (sc >= gS && sc < gE) { const px=Math.floor((sc-gS)/(gE-gS)*m.w); this._lineRGB.g[Math.min(px,m.w-1)]=this._freqToLuma(freq); }
+      if (sc >= bS && sc < bE) { const px=Math.floor((sc-bS)/(bE-bS)*m.w); this._lineRGB.b[Math.min(px,m.w-1)]=this._freqToLuma(freq); }
+      if (sc >= rS && sc < rE) { const px=Math.floor((sc-rS)/(rE-rS)*m.w); this._lineRGB.r[Math.min(px,m.w-1)]=this._freqToLuma(freq); }
+    }
+
+    this._lineSampleCount++;
+
+    // End of line?
+    const lineSamples = msToSamples(m.lineMs);
+    if (this._lineSampleCount >= lineSamples) {
+      this._finishLine();
+    }
+  }
+
+  _finishLine() {
+    const m   = this.mode;
+    const row = this.lineNum;
+    if (!m || row >= m.h) return;
+
+    if (m.type === 'robot36') {
+      const Y = this._lineY || new Uint8Array(m.w).fill(128);
+      const C = this._lineC || new Uint8Array(m.w).fill(128);
+      for (let x = 0; x < m.w; x++) {
+        const y  = Y[x];
+        const isEven = (row % 2 === 0);
+        const cb = isEven  ? C[x] - 128 : this._prevCb;
+        const cr = !isEven ? C[x] - 128 : this._prevCr;
+        if (isEven)  this._prevCb = C[x] - 128;
+        if (!isEven) this._prevCr = C[x] - 128;
+        const [r,g,b] = this._ycbcr2rgb(y, cb, cr);
+        const off = (row * m.w + x) * 4;
+        this.imageData.data[off]=r; this.imageData.data[off+1]=g;
+        this.imageData.data[off+2]=b; this.imageData.data[off+3]=255;
+      }
+      this._lineY = null; this._lineC = null;
+    } else {
+      const rgb = this._lineRGB || { r:new Uint8Array(m.w).fill(128), g:new Uint8Array(m.w).fill(128), b:new Uint8Array(m.w).fill(128) };
+      for (let x = 0; x < m.w; x++) {
+        const off = (row * m.w + x) * 4;
+        this.imageData.data[off]=rgb.r[x]; this.imageData.data[off+1]=rgb.g[x];
+        this.imageData.data[off+2]=rgb.b[x]; this.imageData.data[off+3]=255;
+      }
+      this._lineRGB = null;
+    }
+
+    this.lineNum++;
+    this._lineSampleCount = 0;
+
+    // Repaint every 2 lines
+    if (this.lineNum % 2 === 0 || this.lineNum >= m.h) {
+      this.ctx.putImageData(this.imageData, 0, 0);
+    }
+
+    // Progress
+    const pct = Math.min(100, Math.round(this.lineNum / m.h * 100));
+    document.getElementById('scan-fill').style.width = pct + '%';
+    document.getElementById('scan-pct').textContent  = pct + '%';
+    const remSec = ((m.h - this.lineNum) * m.lineMs / 1000).toFixed(0);
+    document.getElementById('scan-eta').textContent  = remSec + 's remaining';
+
+    if (this.lineNum >= m.h) this._finaliseImage();
+  }
+
+  _ycbcr2rgb(y, cb, cr) {
+    return [
+      Math.max(0, Math.min(255, Math.round(y + 1.402   * cr))),
+      Math.max(0, Math.min(255, Math.round(y - 0.34414 * cb - 0.71414 * cr))),
+      Math.max(0, Math.min(255, Math.round(y + 1.772   * cb))),
+    ];
+  }
+
+  _finaliseImage(complete = true) {
+    if (this.imageData) this.ctx.putImageData(this.imageData, 0, 0);
+    document.getElementById('scan-progress-wrap').style.display = 'none';
+    const modeAtEnd = this.mode;
+    const keepPartial = !complete && !!modeAtEnd && this.lineNum >= Math.max(24, Math.round(modeAtEnd.h * 0.20));
+    if (complete) {
+      updateDecoderState('Image complete ✓', modeAtEnd);
+      if (modeAtEnd) addToGallery(this.canvas, modeAtEnd);
+    } else {
+      if (keepPartial) addToGallery(this.canvas, modeAtEnd);
+      updateDecoderState('Resyncing…', null);
+    }
+    // Reset
+    this.state = 'IDLE'; this.mode = null; this.lineNum = 0;
+    this._leaderCount = 0; this._lineSampleCount = 0;
+    this._resetIdlePreambleDetector();
+    this._resetScanHeaderDetector();
+    document.getElementById('mode-badge').style.color = 'var(--text-dim)';
+    document.getElementById('mode-badge').textContent = '—';
+    document.getElementById('mi-mode').className = 'mode-val';
+    document.getElementById('mi-mode').textContent = 'Scanning…';
+  }
+}
+
+// ============================================================
+//  IMA ADPCM Decoder
+// ============================================================
+const IMA_INDEX_TABLE = [-1,-1,-1,-1,2,4,6,8,-1,-1,-1,-1,2,4,6,8];
+const IMA_STEP_TABLE  = [
+  7,8,9,10,11,12,13,14,16,17,19,21,23,25,28,31,34,37,41,45,50,55,60,66,73,
+  80,88,97,107,118,130,143,157,173,190,209,230,253,279,307,337,371,408,449,
+  494,544,598,658,724,796,876,963,1060,1166,1282,1411,1552,1707,1878,2066,
+  2272,2499,2749,3024,3327,3660,4026,4428,4871,5358,5894,6484,7132,7845,8630,
+  9493,10442,11487,12635,13899,15289,16818,18500,20350,22385,24623,27086,29794,32767
+];
+let adpcm_predictor = 0, adpcm_step_index = 0;
+function resetADPCM() { adpcm_predictor = 0; adpcm_step_index = 0; }
+function setADPCMState(stepIndex, predictor) {
+  adpcm_step_index = Math.max(0, Math.min(88, stepIndex | 0));
+  adpcm_predictor  = Math.max(-32768, Math.min(32767, predictor | 0));
+}
+function decodeIMAAdpcm(data, offset, length) {
+  const out = new Int16Array(length * 2);
+  let outIdx = 0;
+  for (let i = 0; i < length; i++) {
+    const byte = data[offset + i];
+    // Low nibble FIRST, then high nibble — IMA ADPCM spec
+    for (let shift of [0, 4]) {
+      const nibble = (byte >> shift) & 0xF;
+      const step = IMA_STEP_TABLE[adpcm_step_index];
+      let diff = step >> 3;
+      if (nibble & 1) diff += step >> 2;
+      if (nibble & 2) diff += step >> 1;
+      if (nibble & 4) diff += step;
+      if (nibble & 8) adpcm_predictor -= diff; else adpcm_predictor += diff;
+      adpcm_predictor = Math.max(-32768, Math.min(32767, adpcm_predictor));
+      adpcm_step_index = Math.max(0, Math.min(88, adpcm_step_index + IMA_INDEX_TABLE[nibble]));
+      out[outIdx++] = adpcm_predictor;
+    }
+  }
+  return out;
+}
+
+// ============================================================
+//  App state
+// ============================================================
+let demod       = null;
+let audioCtx    = null;
+let analyser    = null;
+let kiwiWs      = null;
+let isConnected = false;
+let isDemo      = false;
+let demoTimeout = null;
+let imgCount    = 0;
+
+// Diagnostics
+let connLog           = [];
+let connStartTime     = null;
+let connUrl           = '';
+let lastCloseCode     = null;
+let lastCloseReason   = '';
+let handshakeReceived = false;
+let audioReceived     = false;
+
+// Server browser
+let cachedServers = [];
+let dropdownOpen  = false;
+
+// 20m propagation
+let propCanvas = null;
+let propCtx = null;
+let propData = { spots: [], links: [], bins: [], updatedAt: 0, seq: 0 };
+let propTimer = null;
+
+const specCanvas = document.getElementById('spectrum');
+const watCanvas  = document.getElementById('waterfall');
+const specCtx    = specCanvas.getContext('2d');
+const watCtx     = watCanvas.getContext('2d');
+
+// ============================================================
+//  UI helpers
+// ============================================================
+function setStatus(state, text) {
+  document.getElementById('status-dot').className = 'dot' + (state === 'active' ? ' active' : state === 'error' ? ' error' : '');
+  document.getElementById('status-text').textContent = text;
+}
+
+function updateDecoderState(text, modeDef) {
+  document.getElementById('mi-state').textContent = text;
+  if (modeDef) {
+    document.getElementById('mi-freq').textContent = '14.230 MHz USB';
+  }
+}
+
+function showToast(msg, duration = 4000) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), duration);
+}
+
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fetchWithTimeout(url, ms, options = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  const opts = Object.assign({}, options, { signal: ctrl.signal });
+  return fetch(url, opts).finally(() => clearTimeout(t));
+}
+
+// ============================================================
+//  Gallery
+// ============================================================
+function addToGallery(canvas, modeDef) {
+  imgCount++;
+  document.getElementById('img-count').textContent = imgCount;
+  document.getElementById('gallery-empty').style.display = 'none';
+
+  const thumb = document.createElement('div');
+  thumb.className = 'gallery-thumb';
+  const img = document.createElement('img');
+  img.src = canvas.toDataURL();
+  const info = document.createElement('div');
+  info.className = 'gallery-thumb-info';
+  const ts = new Date().toTimeString().slice(0,8);
+  info.textContent = `${modeDef ? modeDef.name : '?'} ${ts}`;
+  thumb.appendChild(img);
+  thumb.appendChild(info);
+  thumb.onclick = () => {
+    const imgEl = document.getElementById('sstv-canvas');
+    imgEl.style.display = 'block';
+    document.getElementById('sstv-overlay').classList.add('hidden');
+    const ctx = imgEl.getContext('2d');
+    const tmp = new Image(); tmp.src = img.src;
+    tmp.onload = () => { imgEl.width = tmp.width; imgEl.height = tmp.height; ctx.drawImage(tmp,0,0); };
+  };
+  document.getElementById('gallery').prepend(thumb);
+}
+
+function clearGallery() {
+  imgCount = 0;
+  document.getElementById('img-count').textContent = '0';
+  document.getElementById('gallery').innerHTML = '<div class="gallery-empty" id="gallery-empty">No images received yet</div>';
+}
+
+// ============================================================
+//  Spectrum / Waterfall
+// ============================================================
+let specBuf;
+function initViz() {
+  specCanvas.width = specCanvas.offsetWidth || 900;
+  watCanvas.width  = watCanvas.offsetWidth  || 900;
+  specBuf = new Float32Array(analyser ? analyser.frequencyBinCount : 1024);
+  renderViz();
+}
+
+function renderViz() {
+  requestAnimationFrame(renderViz);
+  const sw = specCanvas.width, sh = specCanvas.height;
+  const ww = watCanvas.width,  wh = watCanvas.height;
+
+  let freqData;
+  if (analyser) {
+    analyser.getFloatFrequencyData(specBuf);
+    freqData = specBuf;
+  } else {
+    freqData = new Float32Array(1024).fill(-110);
+    if (isDemo) {
+      // Fake SSTV tones (1500-2300Hz region)
+      const sr2 = SAMPLE_RATE / 2;
+      for (const hz of [1200, 1750, 2100]) {
+        const bin = Math.round(hz / sr2 * freqData.length);
+        for (let d = -2; d <= 2; d++) { if (bin+d >= 0) freqData[bin+d] = -30 + Math.random()*5 - Math.abs(d)*6; }
+      }
+    }
+  }
+
+  // Spectrum
+  specCtx.fillStyle = '#05020e';
+  specCtx.fillRect(0, 0, sw, sh);
+
+  const step = freqData.length / sw;
+  const minDb = -120, maxDb = -20;
+  specCtx.beginPath(); specCtx.strokeStyle = '#b060ff'; specCtx.lineWidth = 1;
+  for (let x = 0; x < sw; x++) {
+    const db = Math.max(minDb, Math.min(maxDb, freqData[Math.round(x*step)] || -120));
+    const y  = sh - ((db - minDb) / (maxDb - minDb)) * sh;
+    x === 0 ? specCtx.moveTo(x,y) : specCtx.lineTo(x,y);
+  }
+  specCtx.stroke();
+
+  // Mark SSTV frequency range (1200–2300Hz)
+  const sr2 = SAMPLE_RATE / 2;
+  const markX  = hz => Math.round(hz / sr2 * sw);
+  const lines = [{hz:1200,col:'rgba(64,224,255,.5)',lbl:'SYNC'},{hz:1500,col:'rgba(80,80,80,.4)',lbl:'BLK'},{hz:2300,col:'rgba(0,255,136,.4)',lbl:'WHT'}];
+  specCtx.setLineDash([3,3]);
+  for (const l of lines) {
+    const x = markX(l.hz);
+    specCtx.strokeStyle = l.col;
+    specCtx.beginPath(); specCtx.moveTo(x,0); specCtx.lineTo(x,sh); specCtx.stroke();
+    specCtx.fillStyle = l.col; specCtx.font = '8px Share Tech Mono'; specCtx.fillText(l.lbl, x+2, 10);
+  }
+  specCtx.setLineDash([]);
+
+  // Waterfall
+  const img = watCtx.getImageData(0, 0, ww, wh);
+  img.data.copyWithin(ww*4, 0, ww*(wh-1)*4);
+  for (let x = 0; x < ww; x++) {
+    const db   = Math.max(minDb, Math.min(maxDb, freqData[Math.round(x*step)] || -120));
+    const norm = (db - minDb) / (maxDb - minDb);
+    const [r,g,b] = heatColor(norm);
+    const o = x*4; img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255;
+  }
+  watCtx.putImageData(img, 0, 0);
+}
+
+function heatColor(v) {
+  v = Math.max(0, Math.min(1, v));
+  if (v < 0.33) return [0, 0, Math.round(v*3*180)];
+  if (v < 0.66) return [Math.round((v-.33)*3*200), 0, Math.round(180-(v-.33)*3*180)];
+  return [200, Math.round((v-.66)*3*255), 0];
+}
+
+// ============================================================
+//  Audio handling — properly scheduled playback queue
+// ============================================================
+let audioNextTime = 0;
+let nativeRate    = 48000;  // updated after AudioContext created
+let lastPlaybackSample = 0;
+let havePlaybackTail   = false;
+let adpcmStateSeen = false;
+let compressedFramesWithoutState = 0;
+
+const SND_FLAG_COMPRESSED    = 0x10;
+const SND_FLAG_LITTLE_ENDIAN = 0x80;
+const SQUELCH_CLOSE_MARGIN_DB = 2.0;
+const SQUELCH_HANG_MS        = 420;
+
+let autoSquelchEnabled = false;
+let squelchThresholdDbm = -95;
+let squelchOpen = true;
+let squelchHangSamples = 0;
+let lastRssiDbm = NaN;
+
+function initAudioContext() {
+  if (audioCtx) { try { audioCtx.close(); } catch(e){} audioCtx = null; }
+
+  // Let browser use its native sample rate — never force 12000
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  nativeRate = audioCtx.sampleRate;  // typically 44100 or 48000
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.8;
+  analyser.connect(audioCtx.destination);
+
+  audioNextTime = 0;  // reset scheduler
+  lastPlaybackSample = 0;
+  havePlaybackTail   = true; // fade-in from silence on first frame
+  adpcmStateSeen = false;
+  compressedFramesWithoutState = 0;
+  squelchOpen = !autoSquelchEnabled;
+  squelchHangSamples = 0;
+  lastRssiDbm = NaN;
+  demod = new SSTVDemodulator(SAMPLE_RATE);  // demod always runs at 12000
+  resetADPCM();
+  document.getElementById('mi-sr').textContent = SAMPLE_RATE + ' Hz (demod) / ' + nativeRate + ' Hz (audio)';
+  updateSquelchUI();
+}
+
+// Resample a Float32Array from srcRate to dstRate using linear interpolation
+function resample(samples, srcRate, dstRate) {
+  if (srcRate === dstRate) return samples;
+  const ratio  = srcRate / dstRate;
+  const outLen = Math.round(samples.length / ratio);
+  const out    = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const pos  = i * ratio;
+    const idx  = Math.floor(pos);
+    const frac = pos - idx;
+    const a    = samples[idx]     ?? 0;
+    const b    = samples[idx + 1] ?? a;
+    out[i] = a + frac * (b - a);
+  }
+  return out;
+}
+
+function updateSquelchUI() {
+  const btn = document.getElementById('btn-auto-squelch');
+  const val = document.getElementById('mi-squelch');
+  const levelEl = document.getElementById('mi-squelch-level');
+  const slider = document.getElementById('squelch-level');
+  if (!btn || !val) return;
+
+  btn.classList.toggle('active', autoSquelchEnabled);
+  btn.textContent = autoSquelchEnabled ? 'AUTO SQUELCH ON' : 'AUTO SQUELCH OFF';
+  if (slider) slider.value = String(Math.round(squelchThresholdDbm));
+  if (levelEl) levelEl.textContent = `${Math.round(squelchThresholdDbm)} dBm`;
+
+  if (!autoSquelchEnabled) {
+    val.className = 'mode-val';
+    val.textContent = 'Off';
+    return;
+  }
+
+  val.className = squelchOpen ? 'mode-val detected' : 'mode-val';
+  val.textContent = `On (${squelchOpen ? 'OPEN' : 'CLOSED'} @ ${Math.round(squelchThresholdDbm)} dBm)`;
+}
+
+function onSquelchLevelInput(value) {
+  const v = Number(value);
+  if (!Number.isFinite(v)) return;
+  squelchThresholdDbm = Math.max(-120, Math.min(-50, v));
+
+  if (autoSquelchEnabled && Number.isFinite(lastRssiDbm)) {
+    evaluateAutoSquelch(lastRssiDbm, 0);
+  } else {
+    updateSquelchUI();
+  }
+}
+
+function setSquelchOpen(open) {
+  if (squelchOpen === open) return;
+  squelchOpen = open;
+
+  if (!open) {
+    // Close out any partial image and reset VIS acquisition so separate
+    // transmissions don't stitch into one frame across idle gaps.
+    if (!isDemo && demod) {
+      if (demod.state === 'SCAN' && demod.mode) demod._finaliseImage(false);
+      demod.state = 'IDLE';
+      demod.mode = null;
+      demod._leaderCount = 0;
+      demod._leader2Count = 0;
+      demod._visBreakCount = 0;
+      demod._visBreak2Count = 0;
+      demod._visBreak2Gap = 0;
+      demod._visBitAcc = 0;
+      demod._visBitN = 0;
+      demod._visBitAvgArr = [];
+    }
+    havePlaybackTail = false;
+    lastPlaybackSample = 0;
+    if (isConnected) updateDecoderState('Squelched — waiting for signal…', null);
+  } else {
+    squelchHangSamples = Math.round(SAMPLE_RATE * SQUELCH_HANG_MS / 1000);
+    if (isConnected) updateDecoderState('Waiting for VIS leader…', null);
+  }
+  updateSquelchUI();
+}
+
+function evaluateAutoSquelch(rssiDbm, frameSamples) {
+  if (!autoSquelchEnabled) {
+    if (!squelchOpen) setSquelchOpen(true);
+    updateSquelchUI();
+    return true;
+  }
+
+  if (!Number.isFinite(rssiDbm)) {
+    updateSquelchUI();
+    return squelchOpen;
+  }
+
+  const openAt  = squelchThresholdDbm;
+  const closeAt = squelchThresholdDbm - SQUELCH_CLOSE_MARGIN_DB;
+
+  if (squelchOpen) {
+    if (rssiDbm >= closeAt) {
+      squelchHangSamples = Math.round(SAMPLE_RATE * SQUELCH_HANG_MS / 1000);
+    } else {
+      squelchHangSamples = Math.max(0, squelchHangSamples - frameSamples);
+      if (squelchHangSamples === 0) setSquelchOpen(false);
+    }
+  } else if (rssiDbm >= openAt) {
+    setSquelchOpen(true);
+  }
+
+  updateSquelchUI();
+  return squelchOpen;
+}
+
+function toggleAutoSquelch() {
+  autoSquelchEnabled = !autoSquelchEnabled;
+  if (!autoSquelchEnabled) {
+    setSquelchOpen(true);
+  } else {
+    squelchHangSamples = 0;
+    setSquelchOpen(false);
+  }
+  if (autoSquelchEnabled && Number.isFinite(lastRssiDbm)) evaluateAutoSquelch(lastRssiDbm, 0);
+  else updateSquelchUI();
+}
+
+function handleKiwiAudio(buf) {
+  if (buf.byteLength < 7) return;
+  const u8 = new Uint8Array(buf);
+
+  // Some Kiwi paths include 'SND' at the start of each binary frame.
+  let off = 0;
+  if (u8.length >= 10 && u8[0] === 0x53 && u8[1] === 0x4e && u8[2] === 0x44) off = 3;
+  if (u8.length < off + 7) return;
+
+  const flags = u8[off];
+  const smeter = (u8[off + 5] << 8) | u8[off + 6];
+  const rssi = 0.1 * smeter - 127;
+  const isCompressed = (flags & SND_FLAG_COMPRESSED) !== 0;
+  const littleEndian = (flags & SND_FLAG_LITTLE_ENDIAN) !== 0;
+  const payloadOff = off + 7;
+  const payload = u8.subarray(payloadOff);
+  if (!payload.length) return;
+
+  if (isCompressed && !adpcmStateSeen) {
+    compressedFramesWithoutState++;
+    // Wait briefly for server ADPCM preset so startup audio doesn't howl.
+    if (compressedFramesWithoutState < 20) return;
+    // Fallback if preset never arrives.
+    resetADPCM();
+    adpcmStateSeen = true;
+  }
+
+  // Decode to float32 at 12 kHz
+  let samples12k;
+  if (!isCompressed) {
+    const view = new DataView(buf, payloadOff);
+    const n    = payload.length >> 1;
+    samples12k = new Float32Array(n);
+    for (let i = 0; i < n; i++) samples12k[i] = view.getInt16(i * 2, littleEndian) / 32768;
+  } else {
+    const pcm  = decodeIMAAdpcm(payload, 0, payload.length);
+    samples12k = new Float32Array(pcm.length);
+    for (let i = 0; i < pcm.length; i++) samples12k[i] = pcm[i] / 32768;
+  }
+
+  // RSSI
+  const sigNorm = Math.max(0, Math.min(1, (rssi + 100) / 70));
+  document.getElementById('sig-bar').style.width = (sigNorm * 100).toFixed(1) + '%';
+  document.getElementById('mi-snr').textContent  = rssi.toFixed(1) + ' dBm';
+  lastRssiDbm = rssi;
+
+  const gateOpen = evaluateAutoSquelch(rssi, samples12k.length);
+
+  // Demodulator only runs when gate is open to prevent noise-only false VIS states.
+  if (demod && gateOpen) demod.processSamples(samples12k);
+
+  // Audio playback — resample to native browser rate for gapless output
+  if (!audioCtx || !analyser) return;
+  if (!gateOpen) return;
+
+  const playback = resample(samples12k, SAMPLE_RATE, nativeRate);
+  if (playback.length > 1) {
+    const edge = Math.min(64, playback.length);
+    if (havePlaybackTail) {
+      for (let i = 0; i < edge; i++) {
+        const t = (i + 1) / edge;
+        playback[i] = lastPlaybackSample * (1 - t) + playback[i] * t;
+      }
+    }
+    lastPlaybackSample = playback[playback.length - 1];
+    havePlaybackTail = true;
+  }
+  const ab  = audioCtx.createBuffer(1, playback.length, nativeRate);
+  ab.copyToChannel(playback, 0);
+  const src = audioCtx.createBufferSource();
+  src.buffer = ab;
+  src.connect(analyser);
+
+  // Keep playback aligned close to real-time without frequent hard resets (which click).
+  const now = audioCtx.currentTime;
+  const targetLead = 0.12;
+  if (!audioNextTime || !Number.isFinite(audioNextTime)) audioNextTime = now + targetLead;
+  if (audioNextTime < now - 0.22) audioNextTime = now + targetLead;      // underrun recovery
+  else if (audioNextTime > now + 1.2) audioNextTime = now + targetLead;  // runaway queue recovery
+  const startAt = Math.max(audioNextTime, now + 0.003);
+  src.start(startAt);
+  audioNextTime = startAt + ab.duration;
+}
+
+// ============================================================
+//  KiwiSDR connection
+// ============================================================
+function connLogEntry(level, msg) {
+  const ts = connStartTime ? ((Date.now()-connStartTime)/1000).toFixed(3)+'s' : '0.000s';
+  connLog.push({ ts, level, msg, wall: new Date().toTimeString().slice(0,8) });
+}
+
+async function connect() {
+  if (isConnected) { disconnect(); return; }
+  const host = document.getElementById('kiwi-host').value.trim();
+  const freq = parseFloat(document.getElementById('freq').value);
+  const mode = document.getElementById('rx-mode').value;
+  if (!host) { showToast('Enter a KiwiSDR host address'); return; }
+
+  setStatus('active', 'CHECKING HOST…');
+  const preflight = await preflightServerHost(host);
+  if (preflight && preflight.state !== 'ok' && preflight.state !== 'unknown') {
+    document.getElementById('btn-connect').textContent = 'CONNECT';
+    if (preflight.state === 'full') {
+      setStatus('error', 'SLOTS FULL');
+      showToast('Receiver is online but all user slots are full');
+      document.getElementById('footer-info').textContent = `KiwiSDR: ${host} (full)`;
+    } else if (preflight.state === 'no14mhz') {
+      setStatus('error', 'NO 20M COVERAGE');
+      showToast('Receiver does not cover 20m band');
+      document.getElementById('footer-info').textContent = `KiwiSDR: ${host} (no 20m coverage)`;
+    } else {
+      setStatus('error', 'UNREACHABLE');
+      showToast('Receiver appears offline or unreachable');
+      document.getElementById('footer-info').textContent = `KiwiSDR: ${host} (unreachable)`;
+    }
+    return;
+  }
+
+  stopDemo();
+  connLog = []; handshakeReceived = false; audioReceived = false;
+  lastCloseCode = null; lastCloseReason = ''; connStartTime = Date.now();
+
+  const isProxyHost = host.includes('.proxy.kiwisdr.com');
+  const isHttps     = location.protocol === 'https:';
+  const wsProto     = isHttps ? 'wss' : 'ws';
+  let wsHost        = isProxyHost ? host.split(':')[0] : host;
+  connUrl = `${wsProto}://${wsHost}/kiwi/${connStartTime}/SND`;
+
+  connLogEntry('info', `Connecting to ${connUrl}`);
+  connLogEntry('info', `Frequency: ${freq} kHz  Mode: ${mode}`);
+  if (isHttps) connLogEntry('warn', 'Page on HTTPS — ws:// may be blocked by browser');
+
+  setStatus('active', 'CONNECTING…');
+  document.getElementById('btn-connect').textContent = 'DISCONNECT';
+  document.getElementById('footer-info').textContent = `KiwiSDR: ${wsHost}`;
+  document.getElementById('mi-freq').textContent     = `${freq} kHz ${mode.toUpperCase()}`;
+
+  let keepaliveTimer = null;
+
+  function kiwi_send(msg) {
+    if (kiwiWs && kiwiWs.readyState === WebSocket.OPEN) {
+      kiwiWs.send(msg);
+      connLogEntry('info', `→ ${msg}`);
+    }
+  }
+
+  function startKeepalive() {
+    kiwi_send('SET keepalive');
+    keepaliveTimer = setInterval(() => kiwi_send('SET keepalive'), 10000);
+  }
+
+  try {
+    kiwiWs = new WebSocket(connUrl);
+    kiwiWs.binaryType = 'arraybuffer';
+    connLogEntry('info', 'WebSocket created');
+
+    kiwiWs.onopen = () => {
+      handshakeReceived = true;
+      connLogEntry('ok', 'WebSocket open');
+      setStatus('active', 'HANDSHAKING');
+      kiwi_send('SET auth t=kiwi p=');
+      // USB, passband 100–3000 Hz — wide enough to hear signal clearly and catch all SSTV tones (1200–2300 Hz)
+      kiwi_send(`SET mod=usb low_cut=100 high_cut=3000 freq=${freq}`);
+      kiwi_send('SET compression=0');
+      // out=48000: tell server our soundcard rate (ignored for DSP — we resample ourselves)
+      kiwi_send('SET AR OK in=12000 out=48000');
+      kiwi_send('SET geo=');
+      kiwi_send('SET zoom=0 start=0');
+      // AGC on, modest gain — let the server manage levels
+      kiwi_send('SET agc=1 hang=0 thresh=-100 slope=6 decay=1000 manGain=50');
+      startKeepalive();
+      isConnected = true;
+      setStatus('active', 'RECEIVING');
+      initAudioContext();
+      updateDecoderState('Waiting for VIS leader…', null);
+    };
+
+    kiwiWs.onmessage = (ev) => {
+      if (ev.data instanceof ArrayBuffer) {
+        if (!audioReceived) { audioReceived = true; connLogEntry('ok', `First audio frame (${ev.data.byteLength}B)`); }
+        handleKiwiAudio(ev.data);
+      } else if (typeof ev.data === 'string') {
+        connLogEntry('info', `← ${ev.data.slice(0,120)}`);
+        if (ev.data.includes('client_public_ip')) kiwi_send('SET ident_user=SSTVRx');
+        if (ev.data.includes('badp'))  connLogEntry('err', 'Bad password');
+        if (ev.data.includes('busy'))  connLogEntry('err', 'All slots busy');
+        const adpcmState = ev.data.match(/audio_adpcm_state=(\d+),(-?\d+)/);
+        if (adpcmState) {
+          setADPCMState(parseInt(adpcmState[1], 10), parseInt(adpcmState[2], 10));
+          adpcmStateSeen = true;
+          compressedFramesWithoutState = 0;
+        }
+      }
+    };
+
+    kiwiWs.onerror = () => connLogEntry('err', 'WS error (see close code)');
+
+    kiwiWs.onclose = (e) => {
+      clearInterval(keepaliveTimer);
+      lastCloseCode = e.code; lastCloseReason = e.reason || '';
+      connLogEntry(e.wasClean ? 'warn' : 'err', `WS closed code=${e.code} clean=${e.wasClean}${e.reason ? ' "'+e.reason+'"':''}`);
+      const wasConn = isConnected;
+      isConnected = false;
+      document.getElementById('btn-connect').textContent = 'CONNECT';
+      if (wasConn) {
+        setStatus('error', `DROPPED (${e.code})`);
+        document.getElementById('footer-info').textContent = `Disconnected — code ${e.code}`;
+        showDropNotice(e.code);
+      } else {
+        setStatus('error', `FAILED (${e.code})`);
+        document.getElementById('footer-info').textContent = `Failed — WS ${e.code}`;
+        diagnoseFail();
+      }
+    };
+  } catch(e) {
+    connLogEntry('err', `Exception: ${e.message}`);
+    setStatus('error', 'ERROR');
+    document.getElementById('btn-connect').textContent = 'CONNECT';
+    diagnoseFail();
+  }
+}
+
+function disconnect() {
+  if (kiwiWs) { connLogEntry('info','User disconnect'); kiwiWs.close(1000,'bye'); kiwiWs=null; }
+  isConnected = false;
+  squelchHangSamples = 0;
+  squelchOpen = true;
+  updateSquelchUI();
+  setStatus('','OFFLINE');
+  document.getElementById('btn-connect').textContent = 'CONNECT';
+  document.getElementById('footer-info').textContent = 'KiwiSDR: disconnected';
+}
+
+// ============================================================
+//  Demo mode — inject a synthetic Robot 36 colour bar image
+// ============================================================
+function startDemo() {
+  if (isDemo) { stopDemo(); return; }
+  if (isConnected) disconnect();
+  isDemo = true;
+  document.getElementById('btn-demo').textContent = 'STOP DEMO';
+  document.getElementById('btn-demo').classList.add('active');
+  setStatus('active', 'DEMO MODE');
+  document.getElementById('footer-info').textContent = 'Simulated · 14.230 MHz SSTV';
+  document.getElementById('mi-sr').textContent = SAMPLE_RATE + ' Hz';
+  document.getElementById('mi-snr').textContent = '~22 dBm';
+  initAudioContext();
+
+  // Synthesize a Robot 36 transmission directly into the demodulator
+  // by calling _startImage and directly painting lines ourselves
+  const modeDef = SSTV_MODES[0x08]; // Robot 36
+  demod._startImage(modeDef);
+
+  let lineNum = 0;
+  const COLOURS = [
+    [255,255,255],[255,255,0],[0,255,255],[0,255,0],
+    [255,0,255],[255,0,0],[0,0,255],[0,0,0],
+    [200,100,50],[50,200,150],[100,50,200]
+  ];
+
+  function paintLine() {
+    if (!isDemo) return;
+    if (lineNum >= modeDef.h) {
+      demod._finaliseImage();
+      setTimeout(() => { if (isDemo) { lineNum=0; demod._startImage(modeDef); paintLine(); } }, 3000);
+      return;
+    }
+
+    // Paint directly into imageData
+    demod.lineNum = lineNum;
+    const row = lineNum;
+    const colIdx = Math.floor(row / modeDef.h * COLOURS.length);
+    const col = COLOURS[colIdx % COLOURS.length];
+    const wave = Math.sin(row * 0.1) * 40;
+    for (let x = 0; x < modeDef.w; x++) {
+      const grad = x / modeDef.w;
+      const r = Math.min(255, Math.max(0, Math.round(col[0] * grad + wave)));
+      const g = Math.min(255, Math.max(0, Math.round(col[1] * (1-grad) + wave)));
+      const b = Math.min(255, Math.max(0, Math.round(col[2] * 0.5 + x*0.3)));
+      const off = (row * modeDef.w + x) * 4;
+      demod.imageData.data[off]   = r;
+      demod.imageData.data[off+1] = g;
+      demod.imageData.data[off+2] = b;
+      demod.imageData.data[off+3] = 255;
+    }
+
+    if (row % 8 === 0) demod.ctx.putImageData(demod.imageData, 0, 0);
+    const pct = (row / modeDef.h * 100).toFixed(0);
+    document.getElementById('scan-fill').style.width  = pct+'%';
+    document.getElementById('scan-pct').textContent   = pct+'%';
+    document.getElementById('scan-eta').textContent   = ((modeDef.h-row)*modeDef.lineMs/1000).toFixed(0)+'s remaining';
+    lineNum++;
+    demoTimeout = setTimeout(paintLine, modeDef.lineMs);
+  }
+  paintLine();
+}
+
+function stopDemo() {
+  isDemo = false;
+  clearTimeout(demoTimeout);
+  document.getElementById('btn-demo').textContent = 'DEMO';
+  document.getElementById('btn-demo').classList.remove('active');
+  if (!isConnected) setStatus('', 'OFFLINE');
+}
+
+// ============================================================
+//  Server browser
+// ============================================================
+
+// Comprehensive seed list — direct-address receivers only, all cover 0-30 MHz
+// Extracted from live kiwisdr.com/.public/ page
+const SEED_SERVERS = [
+  { name:'WD3C — Fair Hill, Maryland, USA',           url:'wd3c.ddns.net:8073',                 loc:'Maryland, USA',      snr:29 },
+  { name:'0-30 MHz SDR — Rome, Italy (IZ0INA)',       url:'79.54.191.219:8073',                 loc:'Rome, Italy',        snr:24 },
+  { name:'G3XOU — Tavistock, Devon, UK',              url:'82.69.125.202:8073',                 loc:'Devon, UK',          snr:24 },
+  { name:'F6ABJ — France',                            url:'f6abj-kiwihf.ddns.net:8075',         loc:'France',             snr:24 },
+  { name:'0-30 MHz SDR — Coimbra, Portugal',          url:'hjf2014.ddns.net:8073',              loc:'Portugal',           snr:24 },
+  { name:'K3FEF — Milford, Pennsylvania, USA',        url:'kiwisdr.k3fef.com:8073',             loc:'Pennsylvania, USA',  snr:25 },
+  { name:'SA4BNA — Arvika, Sweden',                   url:'sa4bna.hopto.org:8073',              loc:'Sweden',             snr:39 },
+  { name:'F4JOY — Pradiers, France',                  url:'f4joy.ddns.net:8073',                loc:'France',             snr:30 },
+  { name:'AUTRERADIO — Tremolat, France',             url:'sdr.autreradioautreculture.com:8074',loc:'France',             snr:31 },
+  { name:'OZ1KVB — Soenderborg, Denmark',             url:'86.52.211.220:8073',                 loc:'Denmark',            snr:21 },
+  { name:'Hamburg Metropol South — Germany',          url:'kiwisdr.dynpc.net:8073',             loc:'Hamburg, Germany',   snr:21 },
+  { name:'G8URE — Chichester, UK',                   url:'g8ure.ddns.net:8075',                loc:'Chichester, UK',     snr:39 },
+  { name:'G3SDR — Weston-super-Mare, UK (8076)',      url:'g3sdr.com:8076',                     loc:'Somerset, UK',       snr:39 },
+  { name:'G3SDR — Weston-super-Mare, UK (8077)',      url:'g3sdr.com:8077',                     loc:'Somerset, UK',       snr:39 },
+  { name:'VK2MB — Sydney, NSW, Australia',            url:'websdr.mwrs.org.au:8073',            loc:'Sydney, Australia',  snr:26 },
+  { name:'VK3KHZ — Victoria, Australia',              url:'sdr-amradioantennas.com:8075',       loc:'Victoria, Australia',snr:26 },
+  { name:'YO3BN — Bucharest, Romania',                url:'kiwisdr.yo3bn.ro:8073',              loc:'Bucharest, Romania', snr:24 },
+  { name:'K1VL — Shrewsbury, Vermont, USA',           url:'sdr.k1vl.com:8073',                  loc:'Vermont, USA',       snr:27 },
+  { name:'HB9HZW — Valais, Switzerland',              url:'kiwisdr.hb9hzw.ch:8073',             loc:'Switzerland',        snr:22 },
+  { name:'G4WIM — Freckleton, Lancashire, UK',        url:'g4wim.ddns.net:8073',                loc:'Lancashire, UK',     snr:44 },
+  { name:'HL5NTR — Daegu City, South Korea',          url:'kiwisdr.hl5ntr.com:8073',            loc:'South Korea',        snr:20 },
+  { name:'TassyJim — Stowport, Tasmania, AU',         url:'tassyjim.ddns.net:8073',             loc:'Tasmania, Australia',snr:16 },
+  { name:'VE2BWX — Montreal, Canada',                 url:'209.91.186.16:8073',                 loc:'Montreal, Canada',   snr:17 },
+  { name:'IK1YRA — Viverone Lake, Italy',             url:'ik1yra.ddns.net:8073',               loc:'Italy',              snr:24 },
+  { name:'KiwiSDR — Memmingen, Germany',              url:'kiwisdr.dynpc.net:8073',             loc:'Germany',            snr:26 },
+  { name:'KiwiSDR — Plonsk, Poland',                  url:'plonsk.hopto.org:8073',              loc:'Poland',             snr:24 },
+  { name:'KiwiSDR — Palomar Mountain, CA',            url:'palomar.ddns.net:8073',              loc:'California, USA',    snr:32 },
+  { name:'Great Lakes Receiver — Muskegon, MI',       url:'greatlakesreceiver.hopto.me:8073',   loc:'Michigan, USA',      snr:29 },
+];
+
+// Per-server probe state: 'unknown' | 'checking' | 'ok' | 'full' | 'offline' | 'no14mhz'
+const serverStatus = {};
+
+function toggleServerDropdown() {
+  const dd = document.getElementById('server-dropdown');
+  dropdownOpen = !dropdownOpen;
+  dd.style.display = dropdownOpen ? 'flex' : 'none';
+}
+
+function onHostInput() {
+  if (dropdownOpen) { document.getElementById('server-dropdown').style.display='none'; dropdownOpen=false; }
+}
+
+function parseKiwiStatusText(txt) {
+  const users = parseInt(txt.match(/users=(\d+)/)?.[1] ?? '0', 10);
+  const maxUsers = parseInt(txt.match(/users_max=(\d+)/)?.[1] ?? '4', 10);
+  const freqMax = parseFloat(txt.match(/freq_max=([\d.]+)/)?.[1] ?? '30000');
+  const freqMin = parseFloat(txt.match(/freq_min=([\d.]+)/)?.[1] ?? '0');
+  const locked = /no_network=1/.test(txt) || /locked=1/.test(txt) || /password=1/.test(txt);
+  const online = /online=1/.test(txt) || /status=running/i.test(txt) || /users=/.test(txt);
+
+  if (!online) return { state: 'offline', users, maxUsers, freqMin, freqMax, locked };
+  if (freqMax < 14000 || freqMin > 14350) return { state: 'no14mhz', users, maxUsers, freqMin, freqMax, locked };
+  if (locked) return { state: 'offline', users, maxUsers, freqMin, freqMax, locked };
+  if (users >= maxUsers && maxUsers > 0) return { state: 'full', users, maxUsers, freqMin, freqMax, locked };
+  return { state: 'ok', users, maxUsers, freqMin, freqMax, locked };
+}
+
+async function fetchKiwiStatus(hostPort, timeoutMs = 7000) {
+  const statusUrl = `http://${hostPort}/status`;
+  const PROXIES = [
+    { kind: 'raw', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(statusUrl)}` },
+    { kind: 'json', url: `https://api.allorigins.win/get?url=${encodeURIComponent(statusUrl)}` },
+  ];
+
+  for (const p of PROXIES) {
+    try {
+      const r = await fetchWithTimeout(p.url, timeoutMs);
+      if (!r.ok) continue;
+      let txt = '';
+      if (p.kind === 'json') txt = (await r.json()).contents || '';
+      else txt = await r.text();
+      if (txt && txt.length > 20) return parseKiwiStatusText(txt);
+    } catch (_) {}
+  }
+
+  // Fallback reachability ping only.
+  try {
+    await fetchWithTimeout(statusUrl, Math.min(timeoutMs, 3500), { mode: 'no-cors' });
+    return { state: 'unknown', users: 0, maxUsers: 4, freqMin: 0, freqMax: 30000, locked: false };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function preflightServerHost(host) {
+  try {
+    const isProxyHost = host.includes('.proxy.kiwisdr.com');
+    const hostPort = isProxyHost ? host.split(':')[0] : host;
+    const st = await fetchKiwiStatus(hostPort, 7000);
+    return st || { state: 'offline' };
+  } catch (_) {
+    return { state: 'offline' };
+  }
+}
+
+async function probeServer(s) {
+  serverStatus[s.url] = 'checking';
+  updateServerBadge(s.url, 'checking');
+
+  const st = await fetchKiwiStatus(s.url, 6500);
+  if (!st) {
+    s.online = false;
+    serverStatus[s.url] = 'offline';
+    updateServerBadge(s.url, 'offline');
+    return;
+  }
+
+  s.usedSlots = st.users ?? 0;
+  s.totalSlots = st.maxUsers ?? 4;
+  s.online = st.state === 'ok';
+  serverStatus[s.url] = st.state || 'unknown';
+  updateServerBadge(s.url, serverStatus[s.url]);
+  rerenderServerItem(s);
+}
+
+function updateServerBadge(url, status) {
+  const el = document.querySelector(`.server-item[data-url="${CSS.escape(url)}"] .srv-online`);
+  if (!el) return;
+  const MAP = {
+    checking: ['⟳','var(--text-dim)'],
+    ok:       ['●','var(--accent2)'],
+    full:     ['■','var(--warn)'],
+    offline:  ['✕','#444'],
+    no14mhz:  ['⊘','#444'],
+    unknown:  ['?','var(--accent3)'],
+  };
+  const [sym, col] = MAP[status] || ['?','var(--text-dim)'];
+  el.textContent = sym; el.style.color = col;
+  el.title = { checking:'Checking…', ok:'Online & available', full:'Online but all slots full', offline:'Unreachable', no14mhz:'Does not cover 14 MHz', unknown:'Reachable but status not fully parseable' }[status] || '';
+  // Dim offline/no14mhz items
+  const item = el.closest('.server-item');
+  if (item) {
+    item.style.opacity = (status==='offline'||status==='no14mhz') ? '0.35' : '';
+    if (status==='offline'||status==='no14mhz') item.style.pointerEvents='none';
+    else if (status!=='full') item.style.pointerEvents='';
+  }
+}
+
+function rerenderServerItem(s) {
+  const item = document.querySelector(`.server-item[data-url="${CSS.escape(s.url)}"]`);
+  if (!item) return;
+  const full = s.usedSlots >= s.totalSlots;
+  const partial = s.usedSlots > 0 && !full;
+  const uc = full?'full':partial?'partial':'open';
+  const slotEl = item.querySelector('.srv-users');
+  if (slotEl) { slotEl.className=`srv-users ${uc}`; slotEl.textContent=`${s.usedSlots}/${s.totalSlots}`; }
+}
+
+async function loadPublicServers(forceRefresh) {
+  const btn      = document.getElementById('btn-refresh-servers');
+  const listEl   = document.getElementById('server-list-items');
+  const statusEl = document.getElementById('server-list-status');
+
+  // Always show seed list immediately — never block on network
+  let servers = [...SEED_SERVERS].map(s => ({...s, usedSlots:0, totalSlots:4, online:null, direct:true}));
+
+  btn.classList.add('spinning'); btn.textContent = '↺';
+
+  // Try to augment with live list in background (non-blocking)
+  fetchLiveList().then(liveServers => {
+    if (liveServers.length > 0) {
+      // Merge live data: add any new entries, update names
+      const knownUrls = new Set(servers.map(s=>s.url));
+      for (const ls of liveServers) {
+        if (!knownUrls.has(ls.url)) { servers.push(ls); knownUrls.add(ls.url); }
+      }
+      servers.sort((a,b)=>(b.snr||0)-(a.snr||0));
+      cachedServers = servers;
+      renderServerList(servers);
+      statusEl.textContent = `${servers.length} HF receivers — probing…`;
+    }
+  }).catch(()=>{});
+
+  cachedServers = servers;
+  renderServerList(servers);
+  statusEl.textContent = `${servers.length} receivers — probing online status…`;
+  btn.classList.remove('spinning'); btn.textContent='↺ REFRESH';
+
+  // Dismiss preparing overlay now that list is ready
+  dismissPreparing();
+
+  // Probe servers in batches with parsed /status checks.
+  const BATCH = 6;
+  for (let i = 0; i < servers.length; i += BATCH) {
+    const batch = servers.slice(i, i+BATCH);
+    await Promise.all(batch.map(s => probeServer(s)));
+    // Small delay between batches to avoid hammering
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  // Count reachable
+  const reachable = servers.filter(s => ['ok', 'full', 'unknown'].includes(serverStatus[s.url])).length;
+  statusEl.textContent = `${reachable} of ${servers.length} reachable — click to connect`;
+}
+
+async function fetchLiveList() {
+  const TARGET  = 'http://kiwisdr.com/.public/';
+  const PROXIES = [
+    { url:`https://api.allorigins.win/get?url=${encodeURIComponent(TARGET)}`, json:true },
+    { url:`https://corsproxy.io/?url=${encodeURIComponent(TARGET)}`,          json:false },
+    { url:`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(TARGET)}`, json:false },
+  ];
+  for (const p of PROXIES) {
+    try {
+      const r = await fetchWithTimeout(p.url, 9000);
+      if (!r.ok) continue;
+      const txt = p.json ? (await r.json()).contents : await r.text();
+      if (txt && txt.length > 1000) return parseKiwiList(txt);
+    } catch(e) {}
+  }
+  return [];
+}
+
+function parseKiwiList(html) {
+  const servers=[], seen=new Set();
+  // Format per line: NAME http://host:port KiwiSDR N vX (N/N users, SNR N/N dB)
+  const lineRe = /http:\/\/([\w\.\-]+:\d+)/g;
+  for (const line of html.split('\n')) {
+    let m;
+    lineRe.lastIndex = 0;
+    while ((m = lineRe.exec(line)) !== null) {
+      const url = m[1];
+      if (seen.has(url)) continue;
+      if (url.includes('kiwisdr.com') && !url.includes(':')) continue; // skip non-receiver kiwisdr.com URLs
+      seen.add(url);
+      const ctx   = line.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ');
+      const um    = ctx.match(/\((\d+)\/(\d+)\s*users?/i);
+      const snrM  = ctx.match(/SNR\s+([\d]+)/i);
+      // Name: text before the URL on this line
+      const nameM = ctx.slice(0, ctx.indexOf(url)).trim().replace(/\|?\s*$/, '').trim();
+      servers.push({
+        name: (nameM || url).slice(0,80),
+        url, loc:'', direct:true,
+        usedSlots: um?+um[1]:0, totalSlots: um?+um[2]:4,
+        snr: snrM ? +snrM[1] : 20, online: null,
+      });
+    }
+  }
+  // Only direct-address receivers (skip proxy)
+  return servers.filter(s => !s.url.includes('.proxy.kiwisdr.com'));
+}
+
+function renderServerList(servers) {
+  const listEl = document.getElementById('server-list-items');
+  if (!servers.length) {
+    listEl.innerHTML = '<div class="sdd-empty">No receivers found.</div>';
+    return;
+  }
+  listEl.innerHTML = servers.map(s => {
+    const full    = s.usedSlots >= s.totalSlots && s.totalSlots > 0;
+    const partial = s.usedSlots > 0 && !full;
+    const uc  = full?'full':partial?'partial':'open';
+    const ul  = `${s.usedSlots}/${s.totalSlots}`;
+    const snrBadge = s.snr ? `<span class="srv-snr">SNR ${s.snr} dB</span>` : '';
+    // onclick only set on container — we check status before connecting
+    return `<div class="server-item" data-url="${escHtml(s.url)}" onclick="selectServer('${s.url.replace(/'/g,"\\'")}')">
+      <div>
+        <div class="srv-name">
+          <span class="srv-online" title="Checking…" style="color:var(--text-dim);margin-right:5px;font-size:12px">⟳</span>${escHtml(s.name.slice(0,65))}
+        </div>
+        <div class="srv-host">${escHtml(s.url)}</div>
+        ${s.loc ? `<div class="srv-location">📍 ${escHtml(s.loc)}</div>` : ''}
+      </div>
+      <div class="srv-meta">
+        <span class="srv-users ${uc}">${ul}</span>
+        ${snrBadge}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectServer(url) {
+  const status = serverStatus[url];
+  if (status === 'offline' || status === 'no14mhz') return; // badge dims it, but guard anyway
+  if (status === 'full') { showToast('Receiver currently full — choose another'); return; }
+  document.getElementById('kiwi-host').value = url;
+  document.getElementById('server-dropdown').style.display='none';
+  dropdownOpen = false;
+  document.getElementById('server-list-status').textContent = url;
+  connect();
+}
+
+document.addEventListener('click', e => {
+  const w = document.querySelector('.server-picker-wrap');
+  if (w && !w.contains(e.target) && dropdownOpen) {
+    document.getElementById('server-dropdown').style.display='none'; dropdownOpen=false;
+  }
+});
+
+// ── Preparing overlay ─────────────────────────────────────────
+function dismissPreparing() {
+  const ov = document.getElementById('preparing-overlay');
+  if (ov) { ov.style.animation='fadeOut .4s ease forwards'; setTimeout(()=>ov.remove(), 400); }
+}
+
+// ── 20m propagation panel ────────────────────────────────────
+function maidenheadToLatLon(grid) {
+  if (!grid || grid.length < 4) return null;
+  const g = grid.trim();
+  const A = 'A'.charCodeAt(0);
+  const a = 'a'.charCodeAt(0);
+
+  const c0 = g.charCodeAt(0), c1 = g.charCodeAt(1);
+  if (!((c0 >= A && c0 <= A + 17) || (c0 >= a && c0 <= a + 17))) return null;
+  if (!((c1 >= A && c1 <= A + 17) || (c1 >= a && c1 <= a + 17))) return null;
+
+  let lon = ((String.fromCharCode(c0).toUpperCase().charCodeAt(0) - A) * 20) - 180;
+  let lat = ((String.fromCharCode(c1).toUpperCase().charCodeAt(0) - A) * 10) - 90;
+  let cellLon = 20, cellLat = 10;
+
+  if (g.length >= 4) {
+    const d2 = g.charCodeAt(2) - 48;
+    const d3 = g.charCodeAt(3) - 48;
+    if (d2 < 0 || d2 > 9 || d3 < 0 || d3 > 9) return null;
+    lon += d2 * 2;
+    lat += d3 * 1;
+    cellLon = 2; cellLat = 1;
+  }
+  if (g.length >= 6) {
+    const c4 = String.fromCharCode(g.charCodeAt(4)).toUpperCase().charCodeAt(0) - A;
+    const c5 = String.fromCharCode(g.charCodeAt(5)).toUpperCase().charCodeAt(0) - A;
+    if (c4 < 0 || c4 > 23 || c5 < 0 || c5 > 23) return null;
+    lon += c4 * (5 / 60);
+    lat += c5 * (2.5 / 60);
+    cellLon = 5 / 60; cellLat = 2.5 / 60;
+  }
+  if (g.length >= 8) {
+    const d6 = g.charCodeAt(6) - 48;
+    const d7 = g.charCodeAt(7) - 48;
+    if (d6 >= 0 && d6 <= 9 && d7 >= 0 && d7 <= 9) {
+      lon += d6 * (5 / 600);
+      lat += d7 * (2.5 / 600);
+      cellLon = 5 / 600; cellLat = 2.5 / 600;
+    }
+  }
+  return { lat: lat + cellLat / 2, lon: lon + cellLon / 2 };
+}
+
+function mapXY(lat, lon, w, h) {
+  const x = ((lon + 180) / 360) * w;
+  const y = ((90 - lat) / 180) * h;
+  return [x, y];
+}
+
+function drawPropagationMap() {
+  if (!propCanvas || !propCtx) return;
+  const cw = propCanvas.clientWidth || 900;
+  const ch = propCanvas.clientHeight || 300;
+  const dpr = window.devicePixelRatio || 1;
+  const rw = Math.max(1, Math.round(cw * dpr));
+  const rh = Math.max(1, Math.round(ch * dpr));
+  if (propCanvas.width !== rw || propCanvas.height !== rh) {
+    propCanvas.width = rw;
+    propCanvas.height = rh;
+  }
+  propCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  propCtx.fillStyle = '#041224';
+  propCtx.fillRect(0, 0, cw, ch);
+
+  // Graticule
+  propCtx.lineWidth = 1;
+  propCtx.strokeStyle = 'rgba(148, 172, 214, 0.22)';
+  for (let lon = -150; lon <= 150; lon += 30) {
+    const [x] = mapXY(0, lon, cw, ch);
+    propCtx.beginPath(); propCtx.moveTo(x, 0); propCtx.lineTo(x, ch); propCtx.stroke();
+  }
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const [, y] = mapXY(lat, 0, cw, ch);
+    propCtx.beginPath(); propCtx.moveTo(0, y); propCtx.lineTo(cw, y); propCtx.stroke();
+  }
+
+  // Links
+  const links = propData.links || [];
+  const linkN = Math.min(280, links.length);
+  for (let i = 0; i < linkN; i++) {
+    const ln = links[i];
+    const [x1, y1] = mapXY(ln.tx.lat, ln.tx.lon, cw, ch);
+    const [x2, y2] = mapXY(ln.rx.lat, ln.rx.lon, cw, ch);
+    const a = Math.max(0.08, 0.42 - (ln.ageSec / 1800) * 0.34);
+    propCtx.strokeStyle = `rgba(80, 170, 255, ${a.toFixed(3)})`;
+    propCtx.lineWidth = 1;
+    propCtx.beginPath();
+    propCtx.moveTo(x1, y1);
+    propCtx.lineTo(x2, y2);
+    propCtx.stroke();
+  }
+
+  // Heat cells
+  const bins = propData.bins || [];
+  const maxCount = bins.reduce((m, b) => Math.max(m, b.count), 1);
+  for (const b of bins) {
+    const [x, y] = mapXY(b.lat, b.lon, cw, ch);
+    const t = Math.max(0, Math.min(1, b.count / maxCount));
+    const r = 3 + t * 8;
+    const alpha = 0.20 + t * 0.62;
+    propCtx.fillStyle = `rgba(${Math.round(40 + 220 * t)}, ${Math.round(180 + 40 * (1 - t))}, 255, ${alpha.toFixed(3)})`;
+    propCtx.beginPath();
+    propCtx.arc(x, y, r, 0, Math.PI * 2);
+    propCtx.fill();
+  }
+
+  // Map title
+  propCtx.fillStyle = 'rgba(232, 241, 255, 0.92)';
+  propCtx.font = "11px 'IBM Plex Mono'";
+  const ts = propData.updatedAt ? new Date(propData.updatedAt).toTimeString().slice(0, 8) : '--:--:--';
+  propCtx.fillText(`14 MHz activity · ${links.length} links · updated ${ts}`, 10, 16);
+}
+
+function renderPropagationList() {
+  const listEl = document.getElementById('prop-list');
+  const spotsEl = document.getElementById('prop-spots');
+  const linksEl = document.getElementById('prop-links');
+  const gridsEl = document.getElementById('prop-grids');
+  if (!listEl || !spotsEl || !linksEl || !gridsEl) return;
+
+  spotsEl.textContent = String(propData.spots?.length || 0);
+  linksEl.textContent = String(propData.links?.length || 0);
+  gridsEl.textContent = String(propData.bins?.length || 0);
+
+  const routes = propData.routes || [];
+  if (!routes.length) {
+    listEl.innerHTML = '<div class="sdd-empty">No recent 20m spots yet</div>';
+    return;
+  }
+  listEl.innerHTML = routes.slice(0, 22).map(r => `
+    <div class="prop-row">
+      <div class="prop-row-main">${escHtml(r.path)}</div>
+      <div class="prop-row-meta">${r.count} spots · ${r.ageMin}m</div>
+    </div>`).join('');
+}
+
+function parsePropagationXml(xmlText) {
+  const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+  const nodes = Array.from(xml.getElementsByTagName('receptionReport'));
+  const now = Math.floor(Date.now() / 1000);
+  const links = [];
+  const bins = new Map();
+  const routes = new Map();
+  const spots = [];
+
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const txLoc = n.getAttribute('senderLocator') || '';
+    const rxLoc = n.getAttribute('receiverLocator') || '';
+    const tx = maidenheadToLatLon(txLoc);
+    const rx = maidenheadToLatLon(rxLoc);
+    if (!tx || !rx) continue;
+
+    const fs = parseInt(n.getAttribute('flowStartSeconds') || '0', 10);
+    const ageSec = Math.max(0, Math.min(3600, now - fs));
+    const tx4 = txLoc.slice(0, 4).toUpperCase();
+    const rx4 = rxLoc.slice(0, 4).toUpperCase();
+    if (tx4.length < 4 || rx4.length < 4) continue;
+
+    const s = {
+      tx, rx, ageSec,
+      tx4, rx4,
+      sender: n.getAttribute('senderCallsign') || '?',
+      receiver: n.getAttribute('receiverCallsign') || '?',
+      snr: n.getAttribute('sNR') || '',
+    };
+    links.push(s);
+    spots.push(s);
+
+    for (const p of [tx, rx]) {
+      const key = `${Math.round((p.lon + 180) / 2)}:${Math.round((p.lat + 90) / 2)}`;
+      const prev = bins.get(key);
+      if (prev) prev.count++;
+      else bins.set(key, { lat: p.lat, lon: p.lon, count: 1 });
+    }
+
+    const rKey = `${tx4} → ${rx4}`;
+    const prevRoute = routes.get(rKey);
+    if (prevRoute) {
+      prevRoute.count++;
+      prevRoute.ageMin = Math.min(prevRoute.ageMin, Math.round(ageSec / 60));
+    } else {
+      routes.set(rKey, { path: rKey, count: 1, ageMin: Math.round(ageSec / 60) });
+    }
+  }
+
+  links.sort((a, b) => a.ageSec - b.ageSec);
+  const routeArr = Array.from(routes.values()).sort((a, b) => b.count - a.count || a.ageMin - b.ageMin);
+  return {
+    spots,
+    links: links.slice(0, 900),
+    bins: Array.from(bins.values()).sort((a, b) => b.count - a.count).slice(0, 420),
+    routes: routeArr,
+    updatedAt: Date.now(),
+    seq: (propData.seq || 0) + 1,
+  };
+}
+
+async function fetchPropagationData() {
+  const statusEl = document.getElementById('prop-status');
+  if (statusEl) statusEl.textContent = 'Fetching…';
+
+  const target = 'https://pskreporter.info/cgi-bin/pskquery5.pl?encap=0&noactive=1&rronly=1&flowStartSeconds=-900&frange=14000000-14350000';
+  const sources = [
+    { kind: 'raw', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}` },
+    { kind: 'json', url: `https://api.allorigins.win/get?url=${encodeURIComponent(target)}` },
+  ];
+
+  for (const s of sources) {
+    try {
+      const r = await fetchWithTimeout(s.url, 14000);
+      if (!r.ok) continue;
+      const txt = s.kind === 'json' ? ((await r.json()).contents || '') : await r.text();
+      if (!txt || txt.length < 100) continue;
+      if (!txt.includes('<receptionReport')) continue;
+      propData = parsePropagationXml(txt);
+      drawPropagationMap();
+      renderPropagationList();
+      if (statusEl) statusEl.textContent = `Updated ${new Date(propData.updatedAt).toTimeString().slice(0,8)} · seq ${propData.seq}`;
+      return;
+    } catch (_) {}
+  }
+  if (statusEl) statusEl.textContent = 'Update failed';
+}
+
+function refreshPropagation(force = false) {
+  if (force && propTimer) {
+    clearInterval(propTimer);
+    propTimer = null;
+  }
+  fetchPropagationData();
+  if (!propTimer) propTimer = setInterval(fetchPropagationData, 180000);
+}
+
+function initPropagation() {
+  propCanvas = document.getElementById('prop-map');
+  propCtx = propCanvas ? propCanvas.getContext('2d') : null;
+  drawPropagationMap();
+  renderPropagationList();
+  refreshPropagation(true);
+}
+
+// ============================================================
+//  Diagnostics
+// ============================================================
+const WS_CLOSE_CODES = {
+  1000:{name:'Normal Closure',     meaning:'Connection closed normally.',cause:'Server closed cleanly — may be restarting or reached user limit.'},
+  1001:{name:'Going Away',         meaning:'Server shutting down.',      cause:'KiwiSDR server process restarting.'},
+  1006:{name:'Abnormal Closure',   meaning:'TCP dropped unexpectedly.',  cause:'Most common error. Possible causes:\n• Wrong host/port\n• Firewall or proxy blocked the connection\n• KiwiSDR has no free slots\n• Mixed content blocked (HTTPS page → ws://)\n• Proxy host (*.proxy.kiwisdr.com) rejected WebSocket upgrade\n• Password required'},
+  1008:{name:'Policy Violation',   meaning:'Connection rejected.',       cause:'KiwiSDR requires a password, or your IP is blocked.'},
+  1013:{name:'Try Again Later',    meaning:'Server overloaded.',         cause:'All KiwiSDR listener slots are in use. Try another receiver.'},
+  1015:{name:'TLS Handshake Fail', meaning:'TLS/SSL failed.',            cause:'Mismatch: page is HTTPS but KiwiSDR uses plain ws://.'},
+};
+
+function diagnoseFail() {
+  const host=document.getElementById('kiwi-host').value.trim();
+  const isHttps=location.protocol==='https:';
+  const isProxy=host.includes('.proxy.kiwisdr.com');
+  const elapsed=connStartTime?Date.now()-connStartTime:0;
+  const closeInfo=lastCloseCode?(WS_CLOSE_CODES[lastCloseCode]||{name:`Code ${lastCloseCode}`,meaning:`WS close code ${lastCloseCode}`,cause:'Unknown.'}):null;
+
+  const tl=[];
+  tl.push({label:'WebSocket URL',detail:connUrl,state:'ok'});
+  if(isProxy) tl.push({label:'Proxy host detected',detail:`${host} is a reverse proxy — connects port 80, may reject direct WS`,state:'warn'});
+  if(isHttps&&!connUrl.startsWith('wss')) tl.push({label:'Mixed content block',detail:'HTTPS page + ws:// → browser blocks this',state:'fail'});
+  else tl.push({label:'Protocol',detail:isHttps?'HTTPS → wss://':'HTTP → ws:// (OK)',state:isHttps?'warn':'ok'});
+  tl.push({label:'Connection attempt',detail:`${elapsed<200?'Failed instantly (refused/DNS/browser block)':elapsed<5000?`Failed after ${elapsed}ms`:`Timed out after ${(elapsed/1000).toFixed(1)}s`}`,state:'fail'});
+  if(handshakeReceived) { tl.push({label:'TCP + WS handshake',detail:'Opened',state:'ok'}); tl.push({label:'KiwiSDR handshake sent',detail:'SET auth + mod + keepalive dispatched',state:'ok'}); }
+  else tl.push({label:'TCP / WS handshake',detail:'Never completed',state:'fail'});
+  if(audioReceived) tl.push({label:'Audio received',detail:'PCM frames arrived',state:'ok'});
+  else if(handshakeReceived) tl.push({label:'Audio',detail:'No frames received before disconnect',state:'warn'});
+  if(closeInfo) tl.push({label:`Closed — ${closeInfo.name} (${lastCloseCode})`,detail:lastCloseReason||'No message',state:'fail'});
+
+  const fixes=[];
+  if(isProxy) fixes.push({n:1,text:'<strong>Use a direct host</strong> — proxy hosts (*.proxy.kiwisdr.com) often reject standalone WS connections. Choose an entry showing <code>hostname:8073</code> from the server list.'});
+  if(isHttps) fixes.push({n:fixes.length+1,text:'<strong>Mixed content</strong> — save this file and open it via <code>file://</code> or an <code>http://</code> server. HTTPS blocks ws:// connections.'});
+  if(!handshakeReceived) {
+    fixes.push({n:fixes.length+1,text:`<strong>Verify host is online</strong> — open <code>http://${escHtml(host)}</code> in a browser tab. If you see the KiwiSDR UI the address is correct.`});
+    fixes.push({n:fixes.length+1,text:'<strong>Firewall / CORS</strong> — try from a different network or disable VPN/proxy.'});
+  }
+  if(lastCloseCode===1013) fixes.push({n:fixes.length+1,text:'<strong>All slots full</strong> — wait for a listener to disconnect, or pick another receiver from the list.'});
+  if(lastCloseCode===1008) fixes.push({n:fixes.length+1,text:'<strong>Password required</strong> — this KiwiSDR is locked. Find a public receiver at <a class="fix-link" href="http://rx.kiwisdr.com" target="_blank">rx.kiwisdr.com</a>.'});
+  if(!fixes.length) {
+    fixes.push({n:1,text:'<strong>Try another receiver</strong> from the server list — use a direct host (hostname:8073 or IP:port).'});
+    fixes.push({n:2,text:'<strong>Use DEMO mode</strong> to test the SSTV decoder while you troubleshoot.'});
+  }
+  fixes.push({n:fixes.length+1,text:'<strong>DEMO mode</strong> — click DEMO to see the decoder working with a synthetic colour bar image.'});
+
+  showDiagModal({timeline:tl, fixes, closeInfo, elapsed});
+}
+
+function showDiagModal({timeline,fixes,closeInfo,elapsed}) {
+  document.getElementById('diag-modal')?.remove();
+  const backdrop=document.createElement('div');
+  backdrop.className='modal-backdrop'; backdrop.id='diag-modal';
+  backdrop.onclick=e=>{if(e.target===backdrop)backdrop.remove();};
+  const ec=closeInfo?`<div class="error-card"><div class="error-code">WS ${lastCloseCode} — ${closeInfo.name}</div><div class="error-meaning">${closeInfo.meaning}</div><div class="error-cause">${closeInfo.cause}</div></div>`
+    :`<div class="error-card"><div class="error-code">CONNECTION REFUSED</div><div class="error-meaning">WebSocket could not be established</div><div class="error-cause">The browser rejected or could not reach the server before any WebSocket frames were exchanged.</div></div>`;
+  const tlHtml=timeline.map(i=>`<div class="tl-item"><div class="tl-dot ${i.state}"></div><div class="tl-content"><div class="tl-label">${i.label}</div><div class="tl-detail">${i.detail}</div></div></div>`).join('');
+  const fxHtml=fixes.map(f=>`<div class="fix-item"><div class="fix-num">${f.n}</div><div class="fix-text">${f.text}</div></div>`).join('');
+  const logHtml=connLog.map(l=>`<div class="log-line"><span class="log-ts">[${l.wall} +${l.ts}]</span><span class="log-msg-${l.level}">${escHtml(l.msg)}</span></div>`).join('')||'<div class="sdd-empty">No log entries</div>';
+  backdrop.innerHTML=`<div class="modal">
+    <div class="modal-header"><div class="modal-title">⚠ CONNECTION DIAGNOSTICS</div><button class="modal-close" onclick="document.getElementById('diag-modal').remove()">✕</button></div>
+    <div class="modal-body">
+      <div class="conn-summary"><div class="conn-url">${escHtml(connUrl)}</div><div class="conn-duration">+${(elapsed/1000).toFixed(2)}s</div></div>
+      <div class="diag-section"><div class="diag-section-title">Error</div>${ec}</div>
+      <div class="diag-section"><div class="diag-section-title">Connection Timeline</div><div class="timeline">${tlHtml}</div></div>
+      <div class="diag-section"><div class="diag-section-title">How to Fix</div><div class="fix-list">${fxHtml}</div></div>
+      <div class="diag-section"><div class="diag-section-title">Event Log</div><div class="raw-log">${logHtml}</div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="document.getElementById('diag-modal').remove();connect()">RETRY</button>
+      <button class="btn btn-success" onclick="document.getElementById('diag-modal').remove();startDemo()">DEMO</button>
+      <button class="btn" style="border-color:var(--border);color:var(--text-dim)" onclick="document.getElementById('diag-modal').remove()">CLOSE</button>
+    </div>
+  </div>`;
+  document.body.appendChild(backdrop);
+}
+
+function showDropNotice(code) {
+  const info=WS_CLOSE_CODES[code]||{name:'Unknown',meaning:`Code ${code}`};
+  const t=document.createElement('div');
+  t.className='toast'; t.style.cssText='cursor:pointer;max-width:320px;line-height:1.6';
+  t.innerHTML=`<div style="color:var(--accent3);margin-bottom:3px">⚠ DROPPED — WS ${code}</div><div style="color:var(--text-dim);font-size:10px">${info.name}: ${info.meaning}</div><div style="color:var(--accent);font-size:10px;margin-top:3px">Click for diagnostics →</div>`;
+  t.onclick=()=>{t.remove();diagnoseFail();};
+  document.body.appendChild(t);
+  setTimeout(()=>{if(t.parentNode)t.remove();},8000);
+}
+
+// ============================================================
+//  Init
+// ============================================================
+window.addEventListener('load', () => {
+  specCanvas.width=specCanvas.offsetWidth||900;
+  watCanvas.width =watCanvas.offsetWidth ||900;
+  initViz();
+  initPropagation();
+  updateSquelchUI();
+  if (location.protocol==='https:') document.getElementById('mixed-content-warn').style.display='block';
+
+  // Start loading server list immediately — overlay dismissed when list renders
+  document.getElementById('prep-status').textContent = 'Scanning public KiwiSDR receivers…';
+  loadPublicServers(false);
+});
+
+window.addEventListener('resize', () => {
+  specCanvas.width=specCanvas.offsetWidth||900;
+  watCanvas.width =watCanvas.offsetWidth ||900;
+  drawPropagationMap();
+});
+</script>
+</body>
+</html>
+
+
+
